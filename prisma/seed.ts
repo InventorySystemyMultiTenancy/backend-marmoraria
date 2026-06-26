@@ -89,6 +89,7 @@ async function main() {
   const marbles = await Promise.all(
     [
       {
+        id: 'marble-carrara-branco',
         name: 'Carrara Branco',
         description: 'Mármore italiano clássico, veios cinza suaves em fundo branco.',
         origin: 'Itália',
@@ -96,9 +97,9 @@ async function main() {
         type: 'MARBLE' as const,
         pricePerM2: 890,
         thickness: 20,
-        imageUrls: [],
       },
       {
+        id: 'marble-preto-sao-gabriel',
         name: 'Preto São Gabriel',
         description: 'Granito preto intenso, ideal para bancadas de cozinha.',
         origin: 'Brasil - ES',
@@ -106,9 +107,9 @@ async function main() {
         type: 'GRANITE' as const,
         pricePerM2: 650,
         thickness: 20,
-        imageUrls: [],
       },
       {
+        id: 'marble-travertino-romano',
         name: 'Travertino Romano',
         description: 'Textura porosa e tons amarelados, clássico em fachadas.',
         origin: 'Itália',
@@ -116,9 +117,9 @@ async function main() {
         type: 'TRAVERTINE' as const,
         pricePerM2: null,
         thickness: 20,
-        imageUrls: [],
       },
       {
+        id: 'marble-quartzito-taj-mahal',
         name: 'Quartzito Taj Mahal',
         description: 'Aparência de mármore com resistência de quartzito.',
         origin: 'Brasil - MG',
@@ -126,9 +127,9 @@ async function main() {
         type: 'QUARTZITE' as const,
         pricePerM2: 1450,
         thickness: 20,
-        imageUrls: [],
       },
       {
+        id: 'marble-granito-verde-ubatuba',
         name: 'Granito Verde Ubatuba',
         description: 'Tons esverdeados escuros com brilho mineral.',
         origin: 'Brasil - ES',
@@ -136,15 +137,19 @@ async function main() {
         type: 'GRANITE' as const,
         pricePerM2: 520,
         thickness: 20,
-        imageUrls: [],
       },
-    ].map((data) => prisma.marble.create({ data }))
+    ].map(({ id, ...data }) =>
+      prisma.marble.upsert({ where: { id }, update: {}, create: { id, ...data, imageUrls: [] } })
+    )
   );
 
   await Promise.all(
     marbles.map((marble, idx) =>
-      prisma.stockItem.create({
-        data: {
+      prisma.stockItem.upsert({
+        where: { id: `stock-seed-${marble.id}` },
+        update: {},
+        create: {
+          id: `stock-seed-${marble.id}`,
           marbleId: marble.id,
           slabNumber: `LOTE-${idx + 1}`,
           widthCm: 300,
