@@ -1,11 +1,16 @@
 import { v2 as cloudinary } from 'cloudinary';
 import multer from 'multer';
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// CLOUDINARY_URL (formato cloudinary://<api_key>:<api_secret>@<cloud_name>) e' lido
+// automaticamente pelo SDK ao ser importado. Os 3 campos separados servem de fallback
+// para ambientes que nao tem o CLOUDINARY_URL configurado.
+if (!process.env.CLOUDINARY_URL) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
 
 export const uploadMarbleImages = multer({
   storage: multer.memoryStorage(),
