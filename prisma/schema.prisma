@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── EMPRESA ─────────────────────────────────────────────
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  cnpj      String?
+  phone     String?
+  whatsapp  String?
+  email     String?
+  address   String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── USUÁRIOS (FUNCIONÁRIOS/ADMINS) ─────────────────────
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(EMPLOYEE)
+  permissions  Json     @default("{}")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  quotes Quote[] @relation("CreatedBy")
+  orders Order[] @relation("AssignedTo")
+}
+
+enum UserRole {
+  MASTER
+  ADMIN
+  EMPLOYEE
+  SALESPERSON
+}
+
+// ─── CLIENTES ────────────────────────────────────────────
+model Client {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  cpfCnpj   String?
+  address   String?
+  city      String?
+  state     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quotes Quote[]
+}
+
+// ─── MÁRMORES / CATÁLOGO ─────────────────────────────────
+model Marble {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  origin      String?
+  color       String?
+  type        MarbleType  @default(MARBLE)
+  pricePerM2  Float?
+  thickness   Float?
+  isAvailable Boolean     @default(true)
+  isPublic    Boolean     @default(true)
+  imageUrls   String[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  stock      StockItem[]
+  quoteItems QuoteItem[]
+}
+
+enum MarbleType {
+  MARBLE
+  GRANITE
+  QUARTZITE
+  PORCELAIN
+  LIMESTONE
+  TRAVERTINE
+  OTHER
+}
+
+// ─── ESTOQUE ─────────────────────────────────────────────
+model StockItem {
+  id          String      @id @default(cuid())
+  marbleId    String
+  marble      Marble      @relation(fields: [marbleId], references: [id])
+  slabNumber  String?
+  widthCm     Float
+  heightCm    Float
+  thicknessMm Float
+  areaM2      Float
+  costPrice   Float?
+  location    String?
+  status      StockStatus @default(AVAILABLE)
+  entryDate   DateTime    @default(now())
+  notes       String?
+  updatedAt   DateTime    @updatedAt
+}
+
+enum StockStatus {
+  AVAILABLE
+  RESERVED
+  USED
+  DAMAGED
+}
+
+// ─── ORÇAMENTOS ──────────────────────────────────────────
+model Quote {
+  id          String      @id @default(cuid())
+  quoteNumber String      @unique
+  clientId    String?
+  client      Client?     @relation(fields: [clientId], references: [id])
+
+  clientName  String?
+  clientPhone String?
+  clientEmail String?
+
+  createdById String
+  createdBy   User        @relation("CreatedBy", fields: [createdById], references: [id])
+
+  status      QuoteStatus @default(DRAFT)
+  items       QuoteItem[]
+
+  subtotal    Float       @default(0)
+  discount    Float       @default(0)
+  discountPct Float       @default(0)
+  total       Float       @default(0)
+
+  notes       String?
+  validUntil  DateTime?
+  pdfUrl      String?
+
+  source      QuoteSource @default(ADMIN)
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  order       Order?
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum QuoteSource {
+  ADMIN
+  SELF_SERVICE
+}
+
+// ─── ITENS DO ORÇAMENTO ───────────────────────────────────
+model QuoteItem {
+  id          String   @id @default(cuid())
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  marbleId    String
+  marble      Marble   @relation(fields: [marbleId], references: [id])
+
+  description String?
+  widthCm     Float
+  heightCm    Float
+  thicknessMm Float
+  quantity    Int      @default(1)
+
+  areaM2      Float
+  unitPrice   Float
+  totalPrice  Float
+
+  extras      Json     @default("[]")
+
+  createdAt   DateTime @default(now())
+}
+
+// ─── PEDIDOS EM PRODUÇÃO ──────────────────────────────────
+model Order {
+  id              String       @id @default(cuid())
+  orderNumber     String       @unique
+  quoteId         String       @unique
+  quote           Quote        @relation(fields: [quoteId], references: [id])
+  assignedToId    String?
+  assignedTo      User?        @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  status          OrderStatus  @default(PENDING)
+  stages          OrderStage[]
+
+  startDate       DateTime?
+  estimatedDate   DateTime?
+  completedDate   DateTime?
+
+  productionNotes String?
+
+  materialCost    Float?
+  laborCost       Float?
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+enum OrderStatus {
+  PENDING
+  IN_CUTTING
+  IN_POLISHING
+  IN_FINISHING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+model OrderStage {
+  id          String    @id @default(cuid())
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id])
+  stageName   String
+  status      String
+  notes       String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+// ─── FINANCEIRO ───────────────────────────────────────────
+model FinancialEntry {
+  id          String        @id @default(cuid())
+  type        FinancialType
+  category    String
+  description String
+  amount      Float
+  date        DateTime
+  orderId     String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum FinancialType {
+  INCOME
+  EXPENSE
+}
+
+// ─── CONFIGURAÇÃO DA FÓRMULA ──────────────────────────────
+model FormulaConfig {
+  id          String   @id @default(cuid())
+  expression  String
+  variables   Json
+  description String?
+  isActive    Boolean  @default(true)
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
