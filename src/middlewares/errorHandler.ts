@@ -29,7 +29,8 @@ export function errorHandler(
   }
 
   logger.error({ err }, 'Erro não tratado');
-  return res.status(500).json({ error: 'Erro interno do servidor' });
+  // TODO-DEBUG: remover detalhe do erro da resposta apos diagnosticar upload Cloudinary
+  return res.status(500).json({ error: 'Erro interno do servidor', debug: err.message });
 }
 
 export function notFoundHandler(req: Request, res: Response) {
