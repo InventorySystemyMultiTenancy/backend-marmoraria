@@ -20,17 +20,23 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
   const clientEmail = quote.client?.email ?? quote.clientEmail ?? '-';
 
   const rows = quote.items
-    .map(
-      (item) => `
+    .map((item) => {
+      const extras = Array.isArray(item.extras) ? (item.extras as { name: string; price: number }[]) : [];
+      const extrasLabel = extras.length
+        ? `<br/><span style="font-size:10px;color:#6B6560;">+ ${extras
+            .map((e) => `${e.name} (${formatCurrency(e.price)})`)
+            .join(', ')}</span>`
+        : '';
+      return `
       <tr>
-        <td>${item.description ?? '-'}</td>
+        <td>${item.description ?? '-'}${extrasLabel}</td>
         <td>${item.marble.name}</td>
         <td>${item.widthCm} x ${item.heightCm} cm (${item.thicknessMm}mm)</td>
         <td>${item.areaM2.toFixed(2)} m²</td>
         <td>${item.quantity}</td>
         <td>${formatCurrency(item.totalPrice)}</td>
-      </tr>`
-    )
+      </tr>`;
+    })
     .join('');
 
   return `
@@ -91,6 +97,11 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
     <div class="totals">
       <div><span>Subtotal:</span><span>${formatCurrency(quote.subtotal)}</span></div>
       <div><span>Desconto:</span><span>${formatCurrency(quote.discount + (quote.subtotal * quote.discountPct) / 100)}</span></div>
+      ${
+        quote.freight > 0
+          ? `<div><span>Frete${quote.freightDistanceKm ? ` (${quote.freightDistanceKm}km)` : ''}:</span><span>${formatCurrency(quote.freight)}</span></div>`
+          : ''
+      }
       <div class="total"><span>TOTAL:</span><span>${formatCurrency(quote.total)}</span></div>
     </div>
 

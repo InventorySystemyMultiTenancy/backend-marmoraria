@@ -23,6 +23,8 @@ const createQuoteSchema = z.object({
   items: z.array(quoteItemSchema).min(1),
   discount: z.number().nonnegative().default(0),
   discountPct: z.number().min(0).max(100).default(0),
+  freight: z.number().nonnegative().default(0),
+  freightDistanceKm: z.number().nonnegative().optional(),
   notes: z.string().optional(),
   validUntil: z.string().optional(),
   source: z.enum(['ADMIN', 'SELF_SERVICE']).default('ADMIN'),
@@ -76,7 +78,8 @@ export async function create(req: Request, res: Response) {
   const { calculated, subtotal, total } = await quotesService.buildQuoteTotals(
     data.items,
     data.discount,
-    data.discountPct
+    data.discountPct,
+    data.freight
   );
 
   const quoteNumber = await quotesService.generateQuoteNumber();
@@ -100,6 +103,8 @@ export async function create(req: Request, res: Response) {
       subtotal,
       discount: data.discount,
       discountPct: data.discountPct,
+      freight: data.freight,
+      freightDistanceKm: data.freightDistanceKm,
       total,
       notes: data.notes,
       validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
@@ -134,7 +139,8 @@ export async function update(req: Request, res: Response) {
     const { calculated, subtotal, total } = await quotesService.buildQuoteTotals(
       data.items,
       data.discount ?? existing.discount,
-      data.discountPct ?? existing.discountPct
+      data.discountPct ?? existing.discountPct,
+      data.freight ?? existing.freight
     );
 
     await prisma.quoteItem.deleteMany({ where: { quoteId: req.params.id } });
@@ -148,6 +154,8 @@ export async function update(req: Request, res: Response) {
         clientEmail: data.clientEmail || undefined,
         discount: data.discount,
         discountPct: data.discountPct,
+        freight: data.freight,
+        freightDistanceKm: data.freightDistanceKm,
         notes: data.notes,
         subtotal,
         total,

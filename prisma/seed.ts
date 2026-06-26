@@ -135,7 +135,7 @@ async function main() {
         origin: 'Brasil - ES',
         color: 'Verde',
         type: 'GRANITE' as const,
-        pricePerM2: 520,
+        pricePerM2: 550,
         thickness: 20,
       },
     ].map(({ id, ...data }) =>

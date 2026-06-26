@@ -63,19 +63,19 @@ model Client {
 
 // ─── MÁRMORES / CATÁLOGO ─────────────────────────────────
 model Marble {
-  id          String      @id @default(cuid())
+  id          String     @id @default(cuid())
   name        String
   description String?
   origin      String?
   color       String?
-  type        MarbleType  @default(MARBLE)
+  type        MarbleType @default(MARBLE)
   pricePerM2  Float?
   thickness   Float?
-  isAvailable Boolean     @default(true)
-  isPublic    Boolean     @default(true)
+  isAvailable Boolean    @default(true)
+  isPublic    Boolean    @default(true)
   imageUrls   String[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   stock      StockItem[]
   quoteItems QuoteItem[]
@@ -118,36 +118,38 @@ enum StockStatus {
 
 // ─── ORÇAMENTOS ──────────────────────────────────────────
 model Quote {
-  id          String      @id @default(cuid())
-  quoteNumber String      @unique
+  id          String  @id @default(cuid())
+  quoteNumber String  @unique
   clientId    String?
-  client      Client?     @relation(fields: [clientId], references: [id])
+  client      Client? @relation(fields: [clientId], references: [id])
 
   clientName  String?
   clientPhone String?
   clientEmail String?
 
   createdById String
-  createdBy   User        @relation("CreatedBy", fields: [createdById], references: [id])
+  createdBy   User   @relation("CreatedBy", fields: [createdById], references: [id])
 
-  status      QuoteStatus @default(DRAFT)
-  items       QuoteItem[]
+  status QuoteStatus @default(DRAFT)
+  items  QuoteItem[]
 
-  subtotal    Float       @default(0)
-  discount    Float       @default(0)
-  discountPct Float       @default(0)
-  total       Float       @default(0)
+  subtotal          Float  @default(0)
+  discount          Float  @default(0)
+  discountPct       Float  @default(0)
+  freight           Float  @default(0)
+  freightDistanceKm Float?
+  total             Float  @default(0)
 
-  notes       String?
-  validUntil  DateTime?
-  pdfUrl      String?
+  notes      String?
+  validUntil DateTime?
+  pdfUrl     String?
 
-  source      QuoteSource @default(ADMIN)
+  source QuoteSource @default(ADMIN)
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  order       Order?
+  order Order?
 }
 
 enum QuoteStatus {
@@ -165,50 +167,50 @@ enum QuoteSource {
 
 // ─── ITENS DO ORÇAMENTO ───────────────────────────────────
 model QuoteItem {
-  id          String   @id @default(cuid())
-  quoteId     String
-  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  marbleId    String
-  marble      Marble   @relation(fields: [marbleId], references: [id])
+  id       String @id @default(cuid())
+  quoteId  String
+  quote    Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  marbleId String
+  marble   Marble @relation(fields: [marbleId], references: [id])
 
   description String?
   widthCm     Float
   heightCm    Float
   thicknessMm Float
-  quantity    Int      @default(1)
+  quantity    Int     @default(1)
 
-  areaM2      Float
-  unitPrice   Float
-  totalPrice  Float
+  areaM2     Float
+  unitPrice  Float
+  totalPrice Float
 
-  extras      Json     @default("[]")
+  extras Json @default("[]")
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 }
 
 // ─── PEDIDOS EM PRODUÇÃO ──────────────────────────────────
 model Order {
-  id              String       @id @default(cuid())
-  orderNumber     String       @unique
-  quoteId         String       @unique
-  quote           Quote        @relation(fields: [quoteId], references: [id])
-  assignedToId    String?
-  assignedTo      User?        @relation("AssignedTo", fields: [assignedToId], references: [id])
+  id           String  @id @default(cuid())
+  orderNumber  String  @unique
+  quoteId      String  @unique
+  quote        Quote   @relation(fields: [quoteId], references: [id])
+  assignedToId String?
+  assignedTo   User?   @relation("AssignedTo", fields: [assignedToId], references: [id])
 
-  status          OrderStatus  @default(PENDING)
-  stages          OrderStage[]
+  status OrderStatus  @default(PENDING)
+  stages OrderStage[]
 
-  startDate       DateTime?
-  estimatedDate   DateTime?
-  completedDate   DateTime?
+  startDate     DateTime?
+  estimatedDate DateTime?
+  completedDate DateTime?
 
   productionNotes String?
 
-  materialCost    Float?
-  laborCost       Float?
+  materialCost Float?
+  laborCost    Float?
 
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 enum OrderStatus {

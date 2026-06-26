@@ -54,14 +54,15 @@ export async function generateQuoteNumber(): Promise<string> {
 export async function buildQuoteTotals(
   items: QuoteItemInput[],
   discount: number,
-  discountPct: number
+  discountPct: number,
+  freight = 0
 ) {
   const expression = await getActiveExpression();
   const calculated = await Promise.all(items.map((item) => calculateItem(item, expression)));
 
   const subtotal = calculated.reduce((sum, c) => sum + c.totalPrice, 0);
   const pctDiscountValue = subtotal * (discountPct / 100);
-  const total = Math.max(0, subtotal - discount - pctDiscountValue);
+  const total = Math.max(0, subtotal - discount - pctDiscountValue + freight);
 
   return { calculated, subtotal, total };
 }

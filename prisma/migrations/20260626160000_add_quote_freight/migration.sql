@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Quote" ADD COLUMN     "freight" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "freightDistanceKm" DOUBLE PRECISION;
