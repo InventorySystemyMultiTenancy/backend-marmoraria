@@ -36,3 +36,38 @@ export async function summary(req: Request, res: Response) {
     lowStockCount: lowStockMarbles.length,
   });
 }
+
+export async function topProducts(req: Request, res: Response) {
+  const grouped = await prisma.quoteItem.groupBy({
+    by: ['marbleId'],
+    _sum: { totalPrice: true, areaM2: true },
+    _count: { id: true },
+    orderBy: { _sum: { totalPrice: 'desc' } },
+    take: 6,
+  });
+
+  const marbles = await prisma.marble.findMany({
+    where: { id: { in: grouped.map((g) => g.marbleId) } },
+    select: { id: true, name: true },
+  });
+  const nameById = new Map(marbles.map((m) => [m.id, m.name]));
+
+  const products = grouped.map((g) => ({
+    marbleId: g.marbleId,
+    name: nameById.get(g.marbleId) ?? 'Mármore removido',
+    totalRevenue: g._sum.totalPrice ?? 0,
+    totalAreaM2: g._sum.areaM2 ?? 0,
+    count: g._count.id,
+  }));
+
+  res.json({ products });
+}
+
+export async function quotesByStatus(req: Request, res: Response) {
+  const grouped = await prisma.quote.groupBy({
+    by: ['status'],
+    _count: { id: true },
+  });
+
+  res.json({ data: grouped.map((g) => ({ status: g.status, count: g._count.id })) });
+}
