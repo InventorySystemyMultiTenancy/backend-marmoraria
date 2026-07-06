@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
-import { paginationParams } from '../../utils/helpers';
+import { addBusinessDays, paginationParams } from '../../utils/helpers';
 import { AppError } from '../../middlewares/errorHandler';
 import * as quotesService from './quotes.service';
 
@@ -60,7 +60,7 @@ export async function getOne(req: Request, res: Response) {
     include: {
       client: true,
       createdBy: { select: { name: true } },
-      items: { include: { marble: { select: { name: true, imageUrls: true } } } },
+      items: { include: { marble: { select: { name: true, imageUrls: true, pricePerM2: true } } } },
       order: true,
     },
   });
@@ -107,7 +107,7 @@ export async function create(req: Request, res: Response) {
       freightDistanceKm: data.freightDistanceKm,
       total,
       notes: data.notes,
-      validUntil: data.validUntil ? new Date(data.validUntil) : undefined,
+      validUntil: data.validUntil ? new Date(data.validUntil) : addBusinessDays(new Date(), 10),
       source: data.source,
       items: {
         create: data.items.map((item, idx) => ({

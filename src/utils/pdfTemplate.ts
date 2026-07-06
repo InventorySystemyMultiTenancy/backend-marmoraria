@@ -27,6 +27,10 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
             .map((e) => `${e.name} (${formatCurrency(e.price)})`)
             .join(', ')}</span>`
         : '';
+      const priceOnRequestLabel =
+        item.marble.pricePerM2 == null
+          ? '<br/><span style="font-size:10px;color:#6B6560;">Aproximadamente (preço sob consulta)</span>'
+          : '';
       return `
       <tr>
         <td>${item.description ?? '-'}${extrasLabel}</td>
@@ -34,7 +38,7 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
         <td>${item.widthCm} x ${item.heightCm} cm (${item.thicknessMm}mm)</td>
         <td>${item.areaM2.toFixed(2)} m²</td>
         <td>${item.quantity}</td>
-        <td>${formatCurrency(item.totalPrice)}</td>
+        <td>${formatCurrency(item.totalPrice)}${priceOnRequestLabel}</td>
       </tr>`;
     })
     .join('');

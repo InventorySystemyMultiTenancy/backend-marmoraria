@@ -17,3 +17,14 @@ export function paginationParams(query: Record<string, unknown>) {
   const skip = (page - 1) * limit;
   return { page, limit, skip };
 }
+
+export function addBusinessDays(start: Date, days: number): Date {
+  const result = new Date(start);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    const dayOfWeek = result.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) added++;
+  }
+  return result;
+}
