@@ -119,3 +119,68 @@ export async function update(req: Request, res: Response) {
 export async function listStageOptions(req: Request, res: Response) {
   res.json({ stages: STAGE_NAMES });
 }
+
+const trackOrderSchema = z.object({
+  orderNumber: z.string().min(1, 'Informe o código do pedido'),
+  phone: z.string().min(1, 'Informe o telefone'),
+});
+
+function onlyDigits(value: string): string {
+  return value.replace(/\D/g, '');
+}
+
+// Rota pública: o número do pedido é sequencial e previsível (ex: PED-2026-0001),
+// então exigimos também o telefone cadastrado para evitar que qualquer pessoa
+// veja dados de outros clientes só adivinhando o código.
+export async function trackOrder(req: Request, res: Response) {
+  const { orderNumber, phone } = trackOrderSchema.parse(req.body);
+
+  const order = await prisma.order.findUnique({
+    where: { orderNumber: orderNumber.trim().toUpperCase() },
+    include: {
+      quote: { include: { client: true, items: { include: { marble: true } } } },
+      stages: { orderBy: { createdAt: 'asc' } },
+    },
+  });
+
+  const storedPhone = order?.quote.client?.phone ?? order?.quote.clientPhone;
+  if (!order || !storedPhone || onlyDigits(storedPhone) !== onlyDigits(phone)) {
+    throw new AppError('Pedido não encontrado. Verifique o código e o telefone informados.', 404);
+  }
+
+  res.json({
+    order: {
+      orderNumber: order.orderNumber,
+      status: order.status,
+      startDate: order.startDate,
+      estimatedDate: order.estimatedDate,
+      completedDate: order.completedDate,
+      createdAt: order.createdAt,
+      stages: order.stages.map((s) => ({
+        stageName: s.stageName,
+        status: s.status,
+        completedAt: s.completedAt,
+      })),
+      quote: {
+        quoteNumber: order.quote.quoteNumber,
+        clientName: order.quote.client?.name ?? order.quote.clientName,
+        subtotal: order.quote.subtotal,
+        discount: order.quote.discount,
+        discountPct: order.quote.discountPct,
+        freight: order.quote.freight,
+        total: order.quote.total,
+        items: order.quote.items.map((item) => ({
+          marbleName: item.marble.name,
+          marbleImage: item.marble.imageUrls[0] ?? null,
+          description: item.description,
+          widthCm: item.widthCm,
+          heightCm: item.heightCm,
+          thicknessMm: item.thicknessMm,
+          quantity: item.quantity,
+          areaM2: item.areaM2,
+          totalPrice: item.totalPrice,
+        })),
+      },
+    },
+  });
+}
