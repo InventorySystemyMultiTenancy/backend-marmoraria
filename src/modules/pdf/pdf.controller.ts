@@ -22,12 +22,12 @@ export async function generateQuotePdf(req: Request, res: Response) {
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '20px', bottom: '20px' } });
+    const pdfBytes = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '20px', bottom: '20px' } });
 
     const disposition = req.query.download ? 'attachment' : 'inline';
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `${disposition}; filename="orcamento-${quote.quoteNumber}.pdf"`);
-    res.send(pdfBuffer);
+    res.send(Buffer.from(pdfBytes));
   } finally {
     await browser.close();
   }
