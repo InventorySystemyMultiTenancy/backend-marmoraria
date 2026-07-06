@@ -1,8 +1,28 @@
 import { Request, Response } from 'express';
 import puppeteer from 'puppeteer';
+import puppeteerCore from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { prisma } from '../../config/database';
 import { renderQuoteHtml } from '../../utils/pdfTemplate';
 import { AppError } from '../../middlewares/errorHandler';
+
+// Em produção (Render), usamos o Chromium empacotado do @sparticuz/chromium via
+// puppeteer-core: baixar o Chrome completo no build provou ser instável (o cache
+// nem sempre sobrevive entre build e runtime). Em dev local, usamos o puppeteer
+// normal, já que o binário do @sparticuz/chromium só roda em Linux.
+async function launchBrowser() {
+  if (process.env.NODE_ENV === 'production') {
+    return puppeteerCore.launch({
+      args: chromium.args,
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    });
+  }
+  return puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
+}
 
 export async function generateQuotePdf(req: Request, res: Response) {
   const quote = await prisma.quote.findUnique({
@@ -14,10 +34,7 @@ export async function generateQuotePdf(req: Request, res: Response) {
   const company = await prisma.company.findFirst();
   const html = renderQuoteHtml(quote, company);
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-  });
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage();
