@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
-import { paginationParams } from '../../utils/helpers';
+import { isValidCpfCnpj, onlyDigits, paginationParams } from '../../utils/helpers';
 import { AppError } from '../../middlewares/errorHandler';
 
 const STAGE_NAMES = ['Aprovado', 'Corte', 'Polimento', 'Acabamento', 'Pronto', 'Entregue'];
@@ -111,6 +111,10 @@ export async function update(req: Request, res: Response) {
         });
       }
     }
+
+    if (data.status === 'CANCELLED') {
+      await prisma.quote.update({ where: { id: order.quoteId }, data: { status: 'CANCELLED' } });
+    }
   }
 
   res.json({ order });
@@ -121,35 +125,34 @@ export async function listStageOptions(req: Request, res: Response) {
 }
 
 const trackOrderSchema = z.object({
-  orderNumber: z.string().min(1, 'Informe o código do pedido'),
-  phone: z.string().min(1, 'Informe o telefone'),
+  cpfCnpj: z.string().refine(isValidCpfCnpj, 'Informe um CPF ou CNPJ válido'),
 });
 
-function onlyDigits(value: string): string {
-  return value.replace(/\D/g, '');
-}
-
-// Rota pública: o número do pedido é sequencial e previsível (ex: PED-2026-0001),
-// então exigimos também o telefone cadastrado para evitar que qualquer pessoa
-// veja dados de outros clientes só adivinhando o código.
+// Rota pública: busca todos os pedidos vinculados ao CPF/CNPJ informado na hora
+// de fazer o orçamento (do próprio cliente cadastrado ou do cliente avulso).
 export async function trackOrder(req: Request, res: Response) {
-  const { orderNumber, phone } = trackOrderSchema.parse(req.body);
+  const { cpfCnpj } = trackOrderSchema.parse(req.body);
+  const normalized = onlyDigits(cpfCnpj);
 
-  const order = await prisma.order.findUnique({
-    where: { orderNumber: orderNumber.trim().toUpperCase() },
+  const orders = await prisma.order.findMany({
+    where: {
+      quote: {
+        OR: [{ clientCpfCnpj: normalized }, { client: { cpfCnpj: normalized } }],
+      },
+    },
     include: {
       quote: { include: { client: true, items: { include: { marble: true } } } },
       stages: { orderBy: { createdAt: 'asc' } },
     },
+    orderBy: { createdAt: 'desc' },
   });
 
-  const storedPhone = order?.quote.client?.phone ?? order?.quote.clientPhone;
-  if (!order || !storedPhone || onlyDigits(storedPhone) !== onlyDigits(phone)) {
-    throw new AppError('Pedido não encontrado. Verifique o código e o telefone informados.', 404);
+  if (orders.length === 0) {
+    throw new AppError('Nenhum pedido encontrado para o CPF/CNPJ informado.', 404);
   }
 
   res.json({
-    order: {
+    orders: orders.map((order) => ({
       orderNumber: order.orderNumber,
       status: order.status,
       startDate: order.startDate,
@@ -181,6 +184,6 @@ export async function trackOrder(req: Request, res: Response) {
           totalPrice: item.totalPrice,
         })),
       },
-    },
+    })),
   });
 }

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
-import { addBusinessDays, paginationParams } from '../../utils/helpers';
+import { addBusinessDays, isValidCpfCnpj, onlyDigits, paginationParams } from '../../utils/helpers';
 import { AppError } from '../../middlewares/errorHandler';
 import * as quotesService from './quotes.service';
 
@@ -20,6 +20,7 @@ const createQuoteSchema = z.object({
   clientName: z.string().optional(),
   clientPhone: z.string().optional(),
   clientEmail: z.string().email().optional().or(z.literal('')),
+  clientCpfCnpj: z.string().refine(isValidCpfCnpj, 'Informe um CPF ou CNPJ válido'),
   items: z.array(quoteItemSchema).min(1),
   discount: z.number().nonnegative().default(0),
   discountPct: z.number().min(0).max(100).default(0),
@@ -92,6 +93,17 @@ export async function create(req: Request, res: Response) {
 
   if (!createdById) throw new AppError('Nenhum usuário disponível para registrar o orçamento', 500);
 
+  const clientCpfCnpj = onlyDigits(data.clientCpfCnpj);
+
+  // Preenche o CPF/CNPJ do cliente cadastrado se ainda não tiver um salvo,
+  // sem sobrescrever um valor já existente.
+  if (data.clientId) {
+    await prisma.client.updateMany({
+      where: { id: data.clientId, cpfCnpj: null },
+      data: { cpfCnpj: clientCpfCnpj },
+    });
+  }
+
   const quote = await prisma.quote.create({
     data: {
       quoteNumber,
@@ -99,6 +111,7 @@ export async function create(req: Request, res: Response) {
       clientName: data.clientName,
       clientPhone: data.clientPhone,
       clientEmail: data.clientEmail || undefined,
+      clientCpfCnpj,
       createdById,
       subtotal,
       discount: data.discount,
@@ -152,6 +165,7 @@ export async function update(req: Request, res: Response) {
         clientName: data.clientName,
         clientPhone: data.clientPhone,
         clientEmail: data.clientEmail || undefined,
+        clientCpfCnpj: data.clientCpfCnpj ? onlyDigits(data.clientCpfCnpj) : undefined,
         discount: data.discount,
         discountPct: data.discountPct,
         freight: data.freight,
@@ -186,6 +200,7 @@ export async function update(req: Request, res: Response) {
       clientName: data.clientName,
       clientPhone: data.clientPhone,
       clientEmail: data.clientEmail || undefined,
+      clientCpfCnpj: data.clientCpfCnpj ? onlyDigits(data.clientCpfCnpj) : undefined,
       notes: data.notes,
     },
   });
@@ -194,7 +209,7 @@ export async function update(req: Request, res: Response) {
 
 export async function updateStatus(req: Request, res: Response) {
   const { status } = z
-    .object({ status: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'EXPIRED']) })
+    .object({ status: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELLED']) })
     .parse(req.body);
 
   const quote = await prisma.quote.update({ where: { id: req.params.id }, data: { status } });

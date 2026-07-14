@@ -123,9 +123,10 @@ model Quote {
   clientId    String?
   client      Client? @relation(fields: [clientId], references: [id])
 
-  clientName  String?
-  clientPhone String?
-  clientEmail String?
+  clientName    String?
+  clientPhone   String?
+  clientEmail   String?
+  clientCpfCnpj String?
 
   createdById String
   createdBy   User   @relation("CreatedBy", fields: [createdById], references: [id])
@@ -158,6 +159,7 @@ enum QuoteStatus {
   APPROVED
   REJECTED
   EXPIRED
+  CANCELLED
 }
 
 enum QuoteSource {
