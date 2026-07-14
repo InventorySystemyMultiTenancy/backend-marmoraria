@@ -22,3 +22,13 @@ export const trackOrderLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Muitas tentativas. Tente novamente em alguns minutos.' },
 });
+
+// Cada chamada custa dinheiro de verdade (API da OpenAI), então o limite é bem mais
+// apertado que os outros endpoints públicos.
+export const aiRecommendLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas. Tente novamente mais tarde.' },
+});

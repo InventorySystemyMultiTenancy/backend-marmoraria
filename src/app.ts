@@ -19,6 +19,7 @@ import formulaRoutes from './modules/formula/formula.routes';
 import pdfRoutes from './modules/pdf/pdf.routes';
 import companyRoutes from './modules/company/company.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
+import aiRoutes from './modules/ai/ai.routes';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/formula', formulaRoutes);
 app.use('/api/pdf', pdfRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/ai', aiRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
