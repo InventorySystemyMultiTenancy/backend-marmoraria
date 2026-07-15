@@ -20,7 +20,10 @@ const createQuoteSchema = z.object({
   clientName: z.string().optional(),
   clientPhone: z.string().optional(),
   clientEmail: z.string().email().optional().or(z.literal('')),
-  clientCpfCnpj: z.string().refine(isValidCpfCnpj, 'Informe um CPF ou CNPJ válido'),
+  clientCpfCnpj: z
+    .string()
+    .optional()
+    .refine((v) => !v || isValidCpfCnpj(v), 'Informe um CPF ou CNPJ válido'),
   items: z.array(quoteItemSchema).min(1),
   discount: z.number().nonnegative().default(0),
   discountPct: z.number().min(0).max(100).default(0),
@@ -93,11 +96,13 @@ export async function create(req: Request, res: Response) {
 
   if (!createdById) throw new AppError('Nenhum usuário disponível para registrar o orçamento', 500);
 
-  const clientCpfCnpj = onlyDigits(data.clientCpfCnpj);
+  // CPF/CNPJ não é obrigatório para criar o orçamento — se não for informado agora,
+  // é pedido depois, na aprovação, já que é o que permite o cliente rastrear o pedido.
+  const clientCpfCnpj = data.clientCpfCnpj ? onlyDigits(data.clientCpfCnpj) : undefined;
 
   // Preenche o CPF/CNPJ do cliente cadastrado se ainda não tiver um salvo,
   // sem sobrescrever um valor já existente.
-  if (data.clientId) {
+  if (data.clientId && clientCpfCnpj) {
     await prisma.client.updateMany({
       where: { id: data.clientId, cpfCnpj: null },
       data: { cpfCnpj: clientCpfCnpj },
@@ -208,11 +213,41 @@ export async function update(req: Request, res: Response) {
 }
 
 export async function updateStatus(req: Request, res: Response) {
-  const { status } = z
-    .object({ status: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELLED']) })
+  const { status, clientCpfCnpj } = z
+    .object({
+      status: z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELLED']),
+      clientCpfCnpj: z.string().optional(),
+    })
     .parse(req.body);
 
-  const quote = await prisma.quote.update({ where: { id: req.params.id }, data: { status } });
+  const existing = await prisma.quote.findUnique({
+    where: { id: req.params.id },
+    include: { client: { select: { cpfCnpj: true } } },
+  });
+  if (!existing) throw new AppError('Orçamento não encontrado', 404);
+
+  // O CPF/CNPJ não é obrigatório para criar o orçamento, mas é o que permite o
+  // cliente rastrear o pedido depois — por isso é exigido aqui, na aprovação,
+  // caso ainda não tenha sido informado.
+  let cpfCnpjToSave: string | undefined;
+  if (status === 'APPROVED' && !existing.clientCpfCnpj && !existing.client?.cpfCnpj) {
+    if (!clientCpfCnpj || !isValidCpfCnpj(clientCpfCnpj)) {
+      throw new AppError('Informe o CPF ou CNPJ do cliente para aprovar o orçamento e permitir o rastreio do pedido.', 400);
+    }
+    cpfCnpjToSave = onlyDigits(clientCpfCnpj);
+  }
+
+  const quote = await prisma.quote.update({
+    where: { id: req.params.id },
+    data: { status, ...(cpfCnpjToSave ? { clientCpfCnpj: cpfCnpjToSave } : {}) },
+  });
+
+  if (cpfCnpjToSave && existing.clientId) {
+    await prisma.client.updateMany({
+      where: { id: existing.clientId, cpfCnpj: null },
+      data: { cpfCnpj: cpfCnpjToSave },
+    });
+  }
 
   if (status === 'APPROVED') {
     const orderNumber = await generateOrderNumber();
