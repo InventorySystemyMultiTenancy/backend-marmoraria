@@ -10,11 +10,11 @@ async function main() {
 
   const companyData = {
     name: 'Marmoraria Pedras Pedroza',
-    cnpj: '00.000.000/0001-00',
-    phone: '(11) 98122-0661',
+    cnpj: '09.247.499.0001.00',
+    phone: '(11)22540986',
     whatsapp: '5511981221189',
-    email: 'contato@pedraspedroza.com.br',
-    address: 'Av. das Marmorarias, 100 - São Paulo, SP',
+    email: 'contato1@pedraspedroza.com.br',
+    address: 'Av. Itaquera 3105 - São Paulo, SP',
   };
   const company = await prisma.company.upsert({
     where: { id: 'company-seed' },
