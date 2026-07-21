@@ -72,6 +72,7 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
         <div class="company-name">${company?.name ?? 'Marmoraria Pedras Pedroza'}</div>
         <div class="company-info">
           ${company?.cnpj ? `CNPJ: ${company.cnpj}<br/>` : ''}
+          ${company?.address ? `${company.address}<br/>` : ''}
           ${company?.phone ? `Tel: ${company.phone}<br/>` : ''}
           ${company?.email ?? ''}
         </div>

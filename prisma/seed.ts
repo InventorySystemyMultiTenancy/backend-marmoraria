@@ -10,11 +10,11 @@ async function main() {
 
   const companyData = {
     name: 'Marmoraria Pedras Pedroza',
-    cnpj: '09.247.499.0001.00',
-    phone: '(11)22540986',
+    cnpj: '09.247.499/0001-00',
+    phone: '(11) 2254-0986',
     whatsapp: '5511981221189',
     email: 'contato1@pedraspedroza.com.br',
-    address: 'Av. Itaquera 3105 - São Paulo, SP',
+    address: 'Avenida Itaquera, 3105 - Jardim Maringá, São Paulo - SP',
   };
   const company = await prisma.company.upsert({
     where: { id: 'company-seed' },
@@ -164,80 +164,85 @@ async function main() {
     )
   );
 
-  const client = await prisma.client.create({
-    data: {
-      name: 'João da Silva',
-      email: 'joao.silva@example.com',
-      phone: '(11) 99999-1234',
-      cpfCnpj: '123.456.789-00',
-      city: 'São Paulo',
-      state: 'SP',
-    },
-  });
+  const demoQuoteNumber = 'ORC-' + new Date().getFullYear() + '-0001';
+  const existingDemoQuote = await prisma.quote.findUnique({ where: { quoteNumber: demoQuoteNumber } });
 
-  const quote = await prisma.quote.create({
-    data: {
-      quoteNumber: 'ORC-' + new Date().getFullYear() + '-0001',
-      clientId: client.id,
-      createdById: master.id,
-      subtotal: 1602,
-      total: 1602,
-      status: 'APPROVED',
-      source: 'ADMIN',
-      items: {
-        create: [
-          {
-            marbleId: marbles[0].id,
-            description: 'Bancada de cozinha',
-            widthCm: 300,
-            heightCm: 60,
-            thicknessMm: 20,
-            quantity: 1,
-            areaM2: 1.8,
-            unitPrice: 890,
-            totalPrice: 1602,
-            extras: [],
-          },
-        ],
+  if (!existingDemoQuote) {
+    const client = await prisma.client.create({
+      data: {
+        name: 'João da Silva',
+        email: 'joao.silva@example.com',
+        phone: '(11) 99999-1234',
+        cpfCnpj: '123.456.789-00',
+        city: 'São Paulo',
+        state: 'SP',
       },
-    },
-  });
+    });
 
-  await prisma.order.create({
-    data: {
-      orderNumber: 'PED-' + new Date().getFullYear() + '-0001',
-      quoteId: quote.id,
-      status: 'IN_CUTTING',
-      startDate: new Date(),
-      estimatedDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    },
-  });
+    const quote = await prisma.quote.create({
+      data: {
+        quoteNumber: demoQuoteNumber,
+        clientId: client.id,
+        createdById: master.id,
+        subtotal: 1602,
+        total: 1602,
+        status: 'APPROVED',
+        source: 'ADMIN',
+        items: {
+          create: [
+            {
+              marbleId: marbles[0].id,
+              description: 'Bancada de cozinha',
+              widthCm: 300,
+              heightCm: 60,
+              thicknessMm: 20,
+              quantity: 1,
+              areaM2: 1.8,
+              unitPrice: 890,
+              totalPrice: 1602,
+              extras: [],
+            },
+          ],
+        },
+      },
+    });
 
-  await prisma.financialEntry.createMany({
-    data: [
-      {
-        type: 'INCOME',
-        category: 'Venda',
-        description: 'Recebimento de sinal - ORC-0001',
-        amount: 800,
-        date: new Date(),
+    await prisma.order.create({
+      data: {
+        orderNumber: 'PED-' + new Date().getFullYear() + '-0001',
+        quoteId: quote.id,
+        status: 'IN_CUTTING',
+        startDate: new Date(),
+        estimatedDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
-      {
-        type: 'EXPENSE',
-        category: 'Material',
-        description: 'Compra de chapas de mármore',
-        amount: 4500,
-        date: new Date(),
-      },
-      {
-        type: 'EXPENSE',
-        category: 'Mão de obra',
-        description: 'Pagamento equipe de corte',
-        amount: 1200,
-        date: new Date(),
-      },
-    ],
-  });
+    });
+
+    await prisma.financialEntry.createMany({
+      data: [
+        {
+          type: 'INCOME',
+          category: 'Venda',
+          description: 'Recebimento de sinal - ORC-0001',
+          amount: 800,
+          date: new Date(),
+        },
+        {
+          type: 'EXPENSE',
+          category: 'Material',
+          description: 'Compra de chapas de mármore',
+          amount: 4500,
+          date: new Date(),
+        },
+        {
+          type: 'EXPENSE',
+          category: 'Mão de obra',
+          description: 'Pagamento equipe de corte',
+          amount: 1200,
+          date: new Date(),
+        },
+      ],
+    });
+  }
 
   console.log('Seed concluído!');
   console.log('---');
