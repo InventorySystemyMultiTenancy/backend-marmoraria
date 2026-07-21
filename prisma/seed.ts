@@ -89,7 +89,6 @@ async function main() {
   const marbles = await Promise.all(
     [
       {
-        id: 'marble-carrara-branco',
         name: 'Carrara Branco',
         description: 'Mármore italiano clássico, veios cinza suaves em fundo branco.',
         origin: 'Itália',
@@ -99,7 +98,6 @@ async function main() {
         thickness: 20,
       },
       {
-        id: 'marble-preto-sao-gabriel',
         name: 'Preto São Gabriel',
         description: 'Granito preto intenso, ideal para bancadas de cozinha.',
         origin: 'Brasil - ES',
@@ -109,7 +107,6 @@ async function main() {
         thickness: 20,
       },
       {
-        id: 'marble-travertino-romano',
         name: 'Travertino Romano',
         description: 'Textura porosa e tons amarelados, clássico em fachadas.',
         origin: 'Itália',
@@ -119,7 +116,6 @@ async function main() {
         thickness: 20,
       },
       {
-        id: 'marble-quartzito-taj-mahal',
         name: 'Quartzito Taj Mahal',
         description: 'Aparência de mármore com resistência de quartzito.',
         origin: 'Brasil - MG',
@@ -129,7 +125,6 @@ async function main() {
         thickness: 20,
       },
       {
-        id: 'marble-granito-verde-ubatuba',
         name: 'Granito Verde Ubatuba',
         description: 'Tons esverdeados escuros com brilho mineral.',
         origin: 'Brasil - ES',
@@ -138,18 +133,20 @@ async function main() {
         pricePerM2: 550,
         thickness: 20,
       },
-    ].map(({ id, ...data }) =>
-      prisma.marble.upsert({ where: { id }, update: {}, create: { id, ...data, imageUrls: [] } })
-    )
+    ].map(async (data) => {
+      const existing = await prisma.marble.findFirst({ where: { name: data.name } });
+      return existing
+        ? prisma.marble.update({ where: { id: existing.id }, data })
+        : prisma.marble.create({ data: { ...data, imageUrls: [] } });
+    })
   );
 
   await Promise.all(
-    marbles.map((marble, idx) =>
-      prisma.stockItem.upsert({
-        where: { id: `stock-seed-${marble.id}` },
-        update: {},
-        create: {
-          id: `stock-seed-${marble.id}`,
+    marbles.map(async (marble, idx) => {
+      const existingStock = await prisma.stockItem.findFirst({ where: { marbleId: marble.id } });
+      if (existingStock) return existingStock;
+      return prisma.stockItem.create({
+        data: {
           marbleId: marble.id,
           slabNumber: `LOTE-${idx + 1}`,
           widthCm: 300,
@@ -160,8 +157,8 @@ async function main() {
           location: 'Galpão A - Setor 1',
           status: 'AVAILABLE',
         },
-      })
-    )
+      });
+    })
   );
 
   const demoQuoteNumber = 'ORC-' + new Date().getFullYear() + '-0001';
