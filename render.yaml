@@ -29,7 +29,7 @@ services:
       - key: COMPANY_NAME
         value: Marmoraria Pedras Pedroza
       - key: COMPANY_WHATSAPP
-        value: "5511981220661"
+        value: "5511981221189"
 
 databases:
   - name: marmoraria-db

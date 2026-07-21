@@ -12,7 +12,7 @@ async function main() {
     name: 'Marmoraria Pedras Pedroza',
     cnpj: '00.000.000/0001-00',
     phone: '(11) 98122-0661',
-    whatsapp: '5511981220661',
+    whatsapp: '5511981221189',
     email: 'contato@pedraspedroza.com.br',
     address: 'Av. das Marmorarias, 100 - São Paulo, SP',
   };
