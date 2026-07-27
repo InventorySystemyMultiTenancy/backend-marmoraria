@@ -17,6 +17,7 @@ model Company {
   email     String?
   address   String?
   logoUrl   String?
+  freightRatePerKm Float?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

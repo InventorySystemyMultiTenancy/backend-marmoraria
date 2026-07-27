@@ -19,7 +19,10 @@ async function main() {
   const company = await prisma.company.upsert({
     where: { id: 'company-seed' },
     update: companyData,
-    create: { id: 'company-seed', ...companyData },
+    // freightRatePerKm so nao entra no `update`: depois da criacao inicial ele passa a
+    // ser editado pela tela admin de Configuracoes da Empresa, e reseed nao pode
+    // sobrescrever o valor configurado pelo lojista.
+    create: { id: 'company-seed', ...companyData, freightRatePerKm: 7 },
   });
 
   const masterPasswordHash = await bcrypt.hash('master123', 10);

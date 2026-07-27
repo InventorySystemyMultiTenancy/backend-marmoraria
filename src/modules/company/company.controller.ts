@@ -10,11 +10,20 @@ const companySchema = z.object({
   email: z.string().email().optional().or(z.literal('')),
   address: z.string().optional(),
   logoUrl: z.string().optional(),
+  freightRatePerKm: z.number().nonnegative().optional(),
 });
 
 export async function getPublic(req: Request, res: Response) {
   const company = await prisma.company.findFirst({
-    select: { name: true, whatsapp: true, phone: true, email: true, logoUrl: true, address: true },
+    select: {
+      name: true,
+      whatsapp: true,
+      phone: true,
+      email: true,
+      logoUrl: true,
+      address: true,
+      freightRatePerKm: true,
+    },
   });
   res.json({ company });
 }
