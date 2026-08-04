@@ -13,6 +13,8 @@ const quoteItemSchema = z.object({
   thicknessMm: z.number().positive(),
   quantity: z.number().int().positive().default(1),
   extras: z.array(z.object({ name: z.string(), price: z.number() })).optional(),
+  includeAcabamento: z.boolean().default(true),
+  includeInstalacao: z.boolean().default(true),
 });
 
 const createQuoteSchema = z.object({

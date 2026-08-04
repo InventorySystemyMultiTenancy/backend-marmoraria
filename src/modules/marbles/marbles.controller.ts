@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { paginationParams } from '../../utils/helpers';
 import { AppError } from '../../middlewares/errorHandler';
-import { uploadBufferToCloudinary } from '../../config/cloudinary';
+import { uploadBufferToCloudinary, destroyCloudinaryImage } from '../../config/cloudinary';
 
 const marbleSchema = z.object({
   name: z.string().min(2),
@@ -92,6 +92,25 @@ export async function uploadImages(req: Request, res: Response) {
     where: { id: req.params.id },
     data: { imageUrls: { push: urls } },
   });
+
+  res.json({ marble });
+}
+
+const deleteImageSchema = z.object({ url: z.string().min(1) });
+
+export async function deleteImage(req: Request, res: Response) {
+  const { url } = deleteImageSchema.parse(req.body);
+
+  const existing = await prisma.marble.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new AppError('Mármore não encontrado', 404);
+  if (!existing.imageUrls.includes(url)) throw new AppError('Imagem não encontrada neste mármore', 404);
+
+  const marble = await prisma.marble.update({
+    where: { id: req.params.id },
+    data: { imageUrls: existing.imageUrls.filter((u) => u !== url) },
+  });
+
+  await destroyCloudinaryImage(url);
 
   res.json({ marble });
 }

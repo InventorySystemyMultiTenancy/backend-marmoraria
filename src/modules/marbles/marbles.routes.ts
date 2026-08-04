@@ -24,5 +24,11 @@ router.post(
   uploadMarbleImages.array('images', 10),
   asyncHandler(controller.uploadImages)
 );
+router.delete(
+  '/:id/images',
+  requireAuth,
+  requirePermission('marbles_edit'),
+  asyncHandler(controller.deleteImage)
+);
 
 export default router;

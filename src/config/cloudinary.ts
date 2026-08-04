@@ -34,4 +34,22 @@ export function uploadBufferToCloudinary(buffer: Buffer): Promise<string> {
   });
 }
 
+// Extrai o public_id (com pasta) de uma secure_url do Cloudinary, ex:
+// https://res.cloudinary.com/<cloud>/image/upload/v169.../marmoraria/marbles/abc123.jpg
+// -> marmoraria/marbles/abc123
+export function cloudinaryPublicIdFromUrl(url: string): string | null {
+  const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-zA-Z0-9]+(?:\?.*)?$/);
+  return match ? match[1] : null;
+}
+
+export async function destroyCloudinaryImage(url: string): Promise<void> {
+  const publicId = cloudinaryPublicIdFromUrl(url);
+  if (!publicId) return;
+  try {
+    await cloudinary.uploader.destroy(publicId);
+  } catch {
+    // Best-effort: se a remoção no Cloudinary falhar, a foto ainda é removida do produto.
+  }
+}
+
 export { cloudinary };

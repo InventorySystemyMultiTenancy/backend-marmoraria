@@ -11,6 +11,8 @@ export interface QuoteItemInput {
   thicknessMm: number;
   quantity: number;
   extras?: { name: string; price: number }[];
+  includeAcabamento?: boolean;
+  includeInstalacao?: boolean;
 }
 
 async function getActiveExpression(): Promise<string> {
@@ -35,6 +37,8 @@ export async function calculateItem(input: QuoteItemInput, expression: string) {
     thickness: input.thicknessMm,
     pricePerM2,
     quantity: input.quantity,
+    includeAcabamento: input.includeAcabamento === false ? 0 : 1,
+    includeInstalacao: input.includeInstalacao === false ? 0 : 1,
   });
 
   const extrasTotal = (input.extras ?? []).reduce((sum, e) => sum + e.price, 0);
