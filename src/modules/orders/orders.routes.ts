@@ -12,5 +12,11 @@ router.get('/', requireAuth, requirePermission('orders_view'), asyncHandler(cont
 router.get('/stages', requireAuth, requirePermission('orders_view'), asyncHandler(controller.listStageOptions));
 router.get('/:id', requireAuth, requirePermission('orders_view'), asyncHandler(controller.getOne));
 router.put('/:id', requireAuth, requirePermission('orders_update_status'), asyncHandler(controller.update));
+router.patch(
+  '/:id/discount',
+  requireAuth,
+  requirePermission('orders_apply_discount'),
+  asyncHandler(controller.applyDiscount)
+);
 
 export default router;

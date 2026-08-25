@@ -15,6 +15,7 @@ export interface UserPermissions {
   orders_create: boolean;
   orders_update_status: boolean;
   orders_view_costs: boolean;
+  orders_apply_discount: boolean;
 
   stock_view: boolean;
   stock_edit: boolean;
@@ -39,7 +40,7 @@ export interface UserPermissions {
 export const PERMISSION_KEYS: (keyof UserPermissions)[] = [
   'clients_view', 'clients_create', 'clients_edit', 'clients_delete',
   'quotes_view', 'quotes_create', 'quotes_edit', 'quotes_delete', 'quotes_approve', 'quotes_pdf',
-  'orders_view', 'orders_create', 'orders_update_status', 'orders_view_costs',
+  'orders_view', 'orders_create', 'orders_update_status', 'orders_view_costs', 'orders_apply_discount',
   'stock_view', 'stock_edit', 'stock_add',
   'financial_view', 'financial_create', 'financial_edit', 'financial_reports',
   'marbles_view', 'marbles_edit', 'marbles_create', 'marbles_delete',

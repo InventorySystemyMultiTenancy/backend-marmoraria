@@ -124,31 +124,114 @@ export async function listStageOptions(req: Request, res: Response) {
   res.json({ stages: STAGE_NAMES });
 }
 
-const trackOrderSchema = z.object({
-  cpfCnpj: z.string().refine(isValidCpfCnpj, 'Informe um CPF ou CNPJ válido'),
+const applyDiscountSchema = z.object({
+  discount: z.number().nonnegative().default(0),
+  discountPct: z.number().min(0).max(100).default(0),
 });
 
-// Rota pública: busca todos os pedidos vinculados ao CPF/CNPJ informado na hora
-// de fazer o orçamento (do próprio cliente cadastrado ou do cliente avulso).
-export async function trackOrder(req: Request, res: Response) {
-  const { cpfCnpj } = trackOrderSchema.parse(req.body);
-  const normalized = onlyDigits(cpfCnpj);
+// Aplica um desconto (valor fixo e/ou percentual) sobre o orçamento vinculado
+// ao pedido e recalcula o total. Se o pedido já tiver sido entregue, o
+// lançamento financeiro correspondente é atualizado para não ficar divergente.
+export async function applyDiscount(req: Request, res: Response) {
+  const data = applyDiscountSchema.parse(req.body);
 
-  const orders = await prisma.order.findMany({
-    where: {
-      quote: {
-        OR: [{ clientCpfCnpj: normalized }, { client: { cpfCnpj: normalized } }],
-      },
-    },
-    include: {
-      quote: { include: { client: true, items: { include: { marble: true } } } },
-      stages: { orderBy: { createdAt: 'asc' } },
-    },
-    orderBy: { createdAt: 'desc' },
+  const order = await prisma.order.findUnique({
+    where: { id: req.params.id },
+    include: { quote: true },
+  });
+  if (!order) throw new AppError('Pedido não encontrado', 404);
+
+  const pctDiscountValue = order.quote.subtotal * (data.discountPct / 100);
+  const total = Math.max(0, order.quote.subtotal - data.discount - pctDiscountValue + order.quote.freight);
+
+  await prisma.quote.update({
+    where: { id: order.quoteId },
+    data: { discount: data.discount, discountPct: data.discountPct, total },
   });
 
+  const financialEntry = await prisma.financialEntry.findFirst({
+    where: { orderId: order.id, type: 'INCOME', category: 'Venda' },
+  });
+  if (financialEntry) {
+    await prisma.financialEntry.update({ where: { id: financialEntry.id }, data: { amount: total } });
+  }
+
+  const updated = await prisma.order.findUnique({
+    where: { id: order.id },
+    include: {
+      quote: { include: { client: true, items: { include: { marble: true } } } },
+      assignedTo: { select: { id: true, name: true } },
+      stages: { orderBy: { createdAt: 'asc' } },
+    },
+  });
+
+  res.json({ order: updated });
+}
+
+const trackOrderSchema = z
+  .object({
+    cpfCnpj: z.string().optional(),
+    phone: z.string().optional(),
+  })
+  .refine((data) => Boolean(data.cpfCnpj?.trim() || data.phone?.trim()), {
+    message: 'Informe o CPF/CNPJ ou o telefone usado no orçamento.',
+  });
+
+// Rota pública: busca todos os pedidos vinculados ao CPF/CNPJ ou ao telefone
+// informado na hora de fazer o orçamento (do próprio cliente cadastrado ou do
+// cliente avulso).
+export async function trackOrder(req: Request, res: Response) {
+  const { cpfCnpj, phone } = trackOrderSchema.parse(req.body);
+
+  const baseInclude = {
+    quote: { include: { client: true, items: { include: { marble: true } } } },
+    stages: { orderBy: { createdAt: 'asc' as const } },
+  };
+
+  let orders;
+
+  if (cpfCnpj?.trim()) {
+    if (!isValidCpfCnpj(cpfCnpj)) {
+      throw new AppError('Informe um CPF ou CNPJ válido', 400);
+    }
+    const normalized = onlyDigits(cpfCnpj);
+
+    orders = await prisma.order.findMany({
+      where: {
+        quote: {
+          OR: [{ clientCpfCnpj: normalized }, { client: { cpfCnpj: normalized } }],
+        },
+      },
+      include: baseInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+  } else {
+    const normalizedPhone = onlyDigits(phone!);
+    if (normalizedPhone.length < 10) {
+      throw new AppError('Informe um telefone válido com DDD', 400);
+    }
+
+    // O telefone não é normalizado no cadastro (pode estar salvo com máscara),
+    // então comparamos apenas os dígitos em memória em vez de filtrar no banco.
+    const candidates = await prisma.order.findMany({
+      where: {
+        quote: {
+          OR: [{ clientPhone: { not: null } }, { client: { phone: { not: null } } }],
+        },
+      },
+      include: baseInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    orders = candidates.filter((order) => {
+      const quotePhone = order.quote.clientPhone ? onlyDigits(order.quote.clientPhone) : null;
+      const clientPhone = order.quote.client?.phone ? onlyDigits(order.quote.client.phone) : null;
+      return quotePhone === normalizedPhone || clientPhone === normalizedPhone;
+    });
+  }
+
   if (orders.length === 0) {
-    throw new AppError('Nenhum pedido encontrado para o CPF/CNPJ informado.', 404);
+    throw new AppError('Nenhum pedido encontrado para os dados informados.', 404);
   }
 
   res.json({
