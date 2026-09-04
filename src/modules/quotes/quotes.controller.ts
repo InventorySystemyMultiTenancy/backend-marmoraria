@@ -253,11 +253,30 @@ export async function updateStatus(req: Request, res: Response) {
 
   if (status === 'APPROVED') {
     const orderNumber = await generateOrderNumber();
-    await prisma.order.upsert({
+    const order = await prisma.order.upsert({
       where: { quoteId: quote.id },
       create: { orderNumber, quoteId: quote.id },
       update: {},
     });
+
+    // A receita é reconhecida assim que o orçamento é aprovado, não só na
+    // entrega — por isso o lançamento é feito aqui. Protegido contra duplicação
+    // caso a aprovação seja acionada mais de uma vez para o mesmo pedido.
+    const existingEntry = await prisma.financialEntry.findFirst({
+      where: { orderId: order.id, type: 'INCOME', category: 'Venda' },
+    });
+    if (!existingEntry) {
+      await prisma.financialEntry.create({
+        data: {
+          type: 'INCOME',
+          category: 'Venda',
+          description: `Orçamento ${quote.quoteNumber} aprovado`,
+          amount: quote.total,
+          date: new Date(),
+          orderId: order.id,
+        },
+      });
+    }
   }
 
   res.json({ quote });

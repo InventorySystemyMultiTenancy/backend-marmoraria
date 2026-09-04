@@ -1,15 +1,33 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../config/database';
 
-export async function summary(req: Request, res: Response) {
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+// Sem `from`/`to` na query, o painel mantém o comportamento padrão (mês
+// corrente); quando informados, os cartões e gráficos passam a refletir o
+// período escolhido (30 dias, 90 dias ou uma data específica).
+function resolveRange(req: Request): { start: Date; end: Date } {
+  const { from, to } = req.query as Record<string, string | undefined>;
 
-  const [quotesThisMonth, ordersInProgress, financialThisMonth, recentQuotes, lowStockMarbles] =
+  if (from || to) {
+    const end = to ? new Date(to) : new Date();
+    end.setHours(23, 59, 59, 999);
+    return {
+      start: from ? new Date(from) : new Date(0),
+      end,
+    };
+  }
+
+  const now = new Date();
+  return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+}
+
+export async function summary(req: Request, res: Response) {
+  const { start, end } = resolveRange(req);
+
+  const [quotesCount, ordersInProgress, financialInPeriod, recentQuotes, lowStockMarbles] =
     await Promise.all([
-      prisma.quote.count({ where: { createdAt: { gte: startOfMonth } } }),
+      prisma.quote.count({ where: { createdAt: { gte: start, lte: end } } }),
       prisma.order.count({ where: { status: { notIn: ['DELIVERED', 'CANCELLED'] } } }),
-      prisma.financialEntry.findMany({ where: { date: { gte: startOfMonth } } }),
+      prisma.financialEntry.findMany({ where: { date: { gte: start, lte: end } } }),
       prisma.quote.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
@@ -23,11 +41,11 @@ export async function summary(req: Request, res: Response) {
       }),
     ]);
 
-  const revenue = financialThisMonth.filter((e) => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
-  const expense = financialThisMonth.filter((e) => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
+  const revenue = financialInPeriod.filter((e) => e.type === 'INCOME').reduce((s, e) => s + e.amount, 0);
+  const expense = financialInPeriod.filter((e) => e.type === 'EXPENSE').reduce((s, e) => s + e.amount, 0);
 
   res.json({
-    quotesThisMonth,
+    quotesCount,
     ordersInProgress,
     revenue,
     expense,
@@ -38,8 +56,11 @@ export async function summary(req: Request, res: Response) {
 }
 
 export async function topProducts(req: Request, res: Response) {
+  const { start, end } = resolveRange(req);
+
   const grouped = await prisma.quoteItem.groupBy({
     by: ['marbleId'],
+    where: { createdAt: { gte: start, lte: end } },
     _sum: { totalPrice: true, areaM2: true },
     _count: { id: true },
     orderBy: { _sum: { totalPrice: 'desc' } },
@@ -64,8 +85,11 @@ export async function topProducts(req: Request, res: Response) {
 }
 
 export async function quotesByStatus(req: Request, res: Response) {
+  const { start, end } = resolveRange(req);
+
   const grouped = await prisma.quote.groupBy({
     by: ['status'],
+    where: { createdAt: { gte: start, lte: end } },
     _count: { id: true },
   });
 

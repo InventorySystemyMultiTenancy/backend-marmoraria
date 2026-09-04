@@ -96,24 +96,13 @@ export async function update(req: Request, res: Response) {
       },
     });
 
-    if (data.status === 'DELIVERED') {
-      const quote = await prisma.quote.findUnique({ where: { id: order.quoteId } });
-      if (quote) {
-        await prisma.financialEntry.create({
-          data: {
-            type: 'INCOME',
-            category: 'Venda',
-            description: `Pedido ${order.orderNumber} entregue`,
-            amount: quote.total,
-            date: new Date(),
-            orderId: order.id,
-          },
-        });
-      }
-    }
-
     if (data.status === 'CANCELLED') {
       await prisma.quote.update({ where: { id: order.quoteId }, data: { status: 'CANCELLED' } });
+      // A receita já foi lançada na aprovação do orçamento — cancelar o pedido
+      // precisa reverter esse lançamento para não inflar o faturamento.
+      await prisma.financialEntry.deleteMany({
+        where: { orderId: order.id, type: 'INCOME', category: 'Venda' },
+      });
     }
   }
 
@@ -130,8 +119,8 @@ const applyDiscountSchema = z.object({
 });
 
 // Aplica um desconto (valor fixo e/ou percentual) sobre o orçamento vinculado
-// ao pedido e recalcula o total. Se o pedido já tiver sido entregue, o
-// lançamento financeiro correspondente é atualizado para não ficar divergente.
+// ao pedido e recalcula o total. A receita já foi lançada na aprovação, então
+// o lançamento financeiro correspondente é atualizado para não ficar divergente.
 export async function applyDiscount(req: Request, res: Response) {
   const data = applyDiscountSchema.parse(req.body);
 
