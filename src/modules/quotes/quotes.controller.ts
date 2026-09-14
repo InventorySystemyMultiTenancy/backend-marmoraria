@@ -13,8 +13,10 @@ const quoteItemSchema = z.object({
   thicknessMm: z.number().positive(),
   quantity: z.number().int().positive().default(1),
   extras: z.array(z.object({ name: z.string(), price: z.number() })).optional(),
-  includeAcabamento: z.boolean().default(true),
-  includeInstalacao: z.boolean().default(true),
+  // Acabamento/frontão e instalação só entram no preço se o cliente/admin marcar
+  // a opção explicitamente — por isso o default é false, não true.
+  includeAcabamento: z.boolean().default(false),
+  includeInstalacao: z.boolean().default(false),
 });
 
 const createQuoteSchema = z.object({

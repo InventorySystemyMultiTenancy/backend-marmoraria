@@ -18,6 +18,19 @@ const testSchema = z.object({
   quantity: z.number().int().positive().default(1),
 });
 
+// Mesmas variáveis do testSchema, mas sem "expression" — usa sempre a fórmula
+// ativa configurada em /admin/formula, e inclui os toggles de acabamento/
+// instalação, já que esses custos só entram se o cliente/admin marcar a opção.
+const previewSchema = z.object({
+  width: z.number().positive(),
+  height: z.number().positive(),
+  thickness: z.number().positive(),
+  pricePerM2: z.number().nonnegative(),
+  quantity: z.number().int().positive().default(1),
+  includeAcabamento: z.boolean().default(false),
+  includeInstalacao: z.boolean().default(false),
+});
+
 export async function getActive(req: Request, res: Response) {
   let formula = await prisma.formulaConfig.findFirst({
     where: { isActive: true },
@@ -46,6 +59,21 @@ export async function getHistory(req: Request, res: Response) {
 export async function test(req: Request, res: Response) {
   const { expression, ...variables } = testSchema.parse(req.body);
   const result = evaluateFormula(expression, variables);
+  res.json({ result });
+}
+
+// Usada pela prévia de orçamento (admin e formulário público): calcula o preço
+// com a MESMA fórmula ativa que o backend usa ao salvar o orçamento e gerar o
+// PDF, para a prévia nunca divergir do valor final. Não expõe o texto da
+// fórmula, só o resultado numérico.
+export async function previewPrice(req: Request, res: Response) {
+  const { includeAcabamento, includeInstalacao, ...variables } = previewSchema.parse(req.body);
+  const expression = await getCurrentExpression();
+  const result = evaluateFormula(expression, {
+    ...variables,
+    includeAcabamento: includeAcabamento ? 1 : 0,
+    includeInstalacao: includeInstalacao ? 1 : 0,
+  });
   res.json({ result });
 }
 
