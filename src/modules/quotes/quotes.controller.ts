@@ -142,6 +142,11 @@ export async function create(req: Request, res: Response) {
           areaM2: calculated[idx].areaM2,
           unitPrice: calculated[idx].unitPrice,
           totalPrice: calculated[idx].totalPrice,
+          includeAcabamento: calculated[idx].includeAcabamento,
+          includeInstalacao: calculated[idx].includeInstalacao,
+          materialValue: calculated[idx].materialValue,
+          acabamentoValue: calculated[idx].acabamentoValue,
+          instalacaoValue: calculated[idx].instalacaoValue,
           extras: item.extras ?? [],
         })),
       },
@@ -193,6 +198,11 @@ export async function update(req: Request, res: Response) {
             areaM2: calculated[idx].areaM2,
             unitPrice: calculated[idx].unitPrice,
             totalPrice: calculated[idx].totalPrice,
+            includeAcabamento: calculated[idx].includeAcabamento,
+            includeInstalacao: calculated[idx].includeInstalacao,
+            materialValue: calculated[idx].materialValue,
+            acabamentoValue: calculated[idx].acabamentoValue,
+            instalacaoValue: calculated[idx].instalacaoValue,
             extras: item.extras ?? [],
           })),
         },
@@ -214,6 +224,53 @@ export async function update(req: Request, res: Response) {
     },
   });
   res.json({ quote });
+}
+
+const updateItemValuesSchema = z.object({
+  materialValue: z.number().nonnegative().optional(),
+  acabamentoValue: z.number().nonnegative().optional(),
+  instalacaoValue: z.number().nonnegative().optional(),
+});
+
+// Só o MASTER pode ajustar manualmente o valor de material/acabamento/instalação
+// de um item — inclusive em orçamentos já aprovados —, por exemplo pra dar um
+// desconto pontual num serviço sem mexer na fórmula geral. Campos omitidos
+// mantêm o valor calculado (o "valor base"); só os informados são sobrescritos.
+export async function updateItemValues(req: Request, res: Response) {
+  const data = updateItemValuesSchema.parse(req.body);
+
+  const item = await prisma.quoteItem.findUnique({ where: { id: req.params.itemId } });
+  if (!item || item.quoteId !== req.params.id) {
+    throw new AppError('Item do orçamento não encontrado', 404);
+  }
+
+  const materialValue = data.materialValue ?? item.materialValue;
+  const acabamentoValue = data.acabamentoValue ?? item.acabamentoValue;
+  const instalacaoValue = data.instalacaoValue ?? item.instalacaoValue;
+  const unitPrice = materialValue + acabamentoValue + instalacaoValue;
+  const extras = (item.extras as { name: string; price: number }[] | null) ?? [];
+  const extrasTotal = extras.reduce((sum, e) => sum + e.price, 0);
+  const totalPrice = unitPrice * item.quantity + extrasTotal;
+
+  await prisma.quoteItem.update({
+    where: { id: item.id },
+    data: { materialValue, acabamentoValue, instalacaoValue, unitPrice, totalPrice, valuesOverridden: true },
+  });
+
+  const quote = await prisma.quote.findUnique({ where: { id: req.params.id }, include: { items: true } });
+  if (!quote) throw new AppError('Orçamento não encontrado', 404);
+
+  const subtotal = quote.items.reduce((sum, i) => sum + i.totalPrice, 0);
+  const pctDiscountValue = subtotal * (quote.discountPct / 100);
+  const total = Math.max(0, subtotal - quote.discount - pctDiscountValue + quote.freight);
+
+  const updated = await prisma.quote.update({
+    where: { id: req.params.id },
+    data: { subtotal, total },
+    include: { items: { include: { marble: { select: { name: true, imageUrls: true, pricePerM2: true } } } } },
+  });
+
+  res.json({ quote: updated });
 }
 
 export async function updateStatus(req: Request, res: Response) {

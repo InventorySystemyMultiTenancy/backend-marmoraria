@@ -31,9 +31,23 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
         item.marble.pricePerM2 == null
           ? '<br/><span style="font-size:10px;color:#6B6560;">Aproximadamente (preço sob consulta)</span>'
           : '';
+      // Detalha quanto do total é material x acabamento/frontão x instalação —
+      // só aparece quando algum desses serviços foi incluído no item. Os valores
+      // já vêm multiplicados pela quantidade, pra bater com a coluna "Total".
+      const serviceParts: string[] = [`Material: ${formatCurrency(item.materialValue * item.quantity)}`];
+      if (item.includeAcabamento) {
+        serviceParts.push(`Acabamento/frontão: ${formatCurrency(item.acabamentoValue * item.quantity)}`);
+      }
+      if (item.includeInstalacao) {
+        serviceParts.push(`Instalação: ${formatCurrency(item.instalacaoValue * item.quantity)}`);
+      }
+      const breakdownLabel =
+        item.includeAcabamento || item.includeInstalacao
+          ? `<br/><span style="font-size:10px;color:#6B6560;">${serviceParts.join(' · ')}</span>`
+          : '';
       return `
       <tr>
-        <td>${item.description ?? '-'}${extrasLabel}</td>
+        <td>${item.description ?? '-'}${breakdownLabel}${extrasLabel}</td>
         <td>${item.marble.name}</td>
         <td>${item.widthCm} x ${item.heightCm} cm (${item.thicknessMm}mm)</td>
         <td>${item.areaM2.toFixed(2)} m²</td>

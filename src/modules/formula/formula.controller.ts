@@ -1,7 +1,12 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
-import { evaluateFormula, FORMULA_VARIABLE_DOCS, DEFAULT_FORMULA_EXPRESSION } from '../../utils/formulaEngine';
+import {
+  evaluateFormula,
+  evaluateFormulaBreakdown,
+  FORMULA_VARIABLE_DOCS,
+  DEFAULT_FORMULA_EXPRESSION,
+} from '../../utils/formulaEngine';
 import { AppError } from '../../middlewares/errorHandler';
 
 const updateSchema = z.object({
@@ -64,17 +69,14 @@ export async function test(req: Request, res: Response) {
 
 // Usada pela prévia de orçamento (admin e formulário público): calcula o preço
 // com a MESMA fórmula ativa que o backend usa ao salvar o orçamento e gerar o
-// PDF, para a prévia nunca divergir do valor final. Não expõe o texto da
-// fórmula, só o resultado numérico.
+// PDF, para a prévia nunca divergir do valor final. Também devolve o
+// detalhamento (material/acabamento/instalação) pra explicar ao cliente/admin
+// de onde vem o valor, sem expor o texto da fórmula em si.
 export async function previewPrice(req: Request, res: Response) {
   const { includeAcabamento, includeInstalacao, ...variables } = previewSchema.parse(req.body);
   const expression = await getCurrentExpression();
-  const result = evaluateFormula(expression, {
-    ...variables,
-    includeAcabamento: includeAcabamento ? 1 : 0,
-    includeInstalacao: includeInstalacao ? 1 : 0,
-  });
-  res.json({ result });
+  const breakdown = evaluateFormulaBreakdown(expression, variables, includeAcabamento, includeInstalacao);
+  res.json({ result: breakdown.unitPrice, ...breakdown });
 }
 
 export async function update(req: Request, res: Response) {

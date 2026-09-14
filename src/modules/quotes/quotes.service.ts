@@ -1,5 +1,5 @@
 import { prisma } from '../../config/database';
-import { evaluateFormula } from '../../utils/formulaEngine';
+import { evaluateFormulaBreakdown } from '../../utils/formulaEngine';
 import { calcAreaM2 } from '../../utils/helpers';
 import { AppError } from '../../middlewares/errorHandler';
 
@@ -30,21 +30,30 @@ export async function calculateItem(input: QuoteItemInput, expression: string) {
 
   const areaM2 = calcAreaM2(input.widthCm, input.heightCm);
   const pricePerM2 = marble.pricePerM2 ?? 0;
+  const includeAcabamento = input.includeAcabamento === true;
+  const includeInstalacao = input.includeInstalacao === true;
 
-  const unitPrice = evaluateFormula(expression, {
-    width: input.widthCm,
-    height: input.heightCm,
-    thickness: input.thicknessMm,
-    pricePerM2,
-    quantity: input.quantity,
-    includeAcabamento: input.includeAcabamento === false ? 0 : 1,
-    includeInstalacao: input.includeInstalacao === false ? 0 : 1,
-  });
+  const { unitPrice, materialValue, acabamentoValue, instalacaoValue } = evaluateFormulaBreakdown(
+    expression,
+    { width: input.widthCm, height: input.heightCm, thickness: input.thicknessMm, pricePerM2, quantity: input.quantity },
+    includeAcabamento,
+    includeInstalacao
+  );
 
   const extrasTotal = (input.extras ?? []).reduce((sum, e) => sum + e.price, 0);
   const totalPrice = unitPrice * input.quantity + extrasTotal;
 
-  return { marble, areaM2, unitPrice, totalPrice };
+  return {
+    marble,
+    areaM2,
+    unitPrice,
+    totalPrice,
+    includeAcabamento,
+    includeInstalacao,
+    materialValue,
+    acabamentoValue,
+    instalacaoValue,
+  };
 }
 
 export async function generateQuoteNumber(): Promise<string> {

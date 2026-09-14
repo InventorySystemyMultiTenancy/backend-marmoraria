@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as controller from './quotes.controller';
-import { requireAuth } from '../../middlewares/auth';
+import { requireAuth, requireRole } from '../../middlewares/auth';
 import { requirePermission } from '../../middlewares/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
@@ -13,6 +13,14 @@ router.get('/', requireAuth, requirePermission('quotes_view'), asyncHandler(cont
 router.get('/:id', requireAuth, requirePermission('quotes_view'), asyncHandler(controller.getOne));
 router.post('/', requireAuth, requirePermission('quotes_create'), asyncHandler(controller.create));
 router.put('/:id', requireAuth, requirePermission('quotes_edit'), asyncHandler(controller.update));
+// Ajuste manual do valor de material/acabamento/instalação de um item — só o
+// MASTER pode, inclusive em orçamentos já aprovados.
+router.patch(
+  '/:id/items/:itemId/values',
+  requireAuth,
+  requireRole('MASTER'),
+  asyncHandler(controller.updateItemValues)
+);
 router.patch(
   '/:id/status',
   requireAuth,

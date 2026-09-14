@@ -1,0 +1,7 @@
+-- AlterTable
+ALTER TABLE "QuoteItem" ADD COLUMN     "includeAcabamento" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "includeInstalacao" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN     "materialValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "acabamentoValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "instalacaoValue" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "valuesOverridden" BOOLEAN NOT NULL DEFAULT false;

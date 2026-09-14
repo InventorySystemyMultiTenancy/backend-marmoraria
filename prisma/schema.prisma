@@ -186,6 +186,17 @@ model QuoteItem {
   unitPrice  Float
   totalPrice Float
 
+  // Se o item inclui acabamento/frontão e/ou instalação, e quanto cada um desses
+  // serviços representa no preço — calculado a partir da fórmula ativa no momento
+  // da criação/edição, mas pode ser sobrescrito manualmente pelo MASTER depois
+  // (ex: orçamento já aprovado) via valuesOverridden.
+  includeAcabamento Boolean @default(false)
+  includeInstalacao Boolean @default(false)
+  materialValue     Float   @default(0)
+  acabamentoValue   Float   @default(0)
+  instalacaoValue   Float   @default(0)
+  valuesOverridden  Boolean @default(false)
+
   extras Json @default("[]")
 
   createdAt DateTime @default(now())

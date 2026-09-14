@@ -38,10 +38,11 @@ export function evaluateFormula(expression: string, variables: FormulaVariables)
 
     const vars = {
       // includeAcabamento/includeInstalacao vêm do orçamento (1 = cliente marcou a
-      // opção, 0 = não marcou) — default 1 para não quebrar fórmulas antigas/testes
-      // que não passam essas variáveis.
-      includeAcabamento: 1,
-      includeInstalacao: 1,
+      // opção, 0 = não marcou). Default 0 (NÃO incluir) se o chamador esquecer de
+      // passar essas variáveis — assim um caller que esqueça o campo nunca cobra
+      // um serviço em silêncio; na pior hipótese, o serviço fica de fora.
+      includeAcabamento: 0,
+      includeInstalacao: 0,
       ...variables,
       area: (variables.width * variables.height) / 10000,
       // Perímetro total (4 lados), em metros lineares — usado para acabamento/frontão.
@@ -62,6 +63,44 @@ export function evaluateFormula(expression: string, variables: FormulaVariables)
   } catch (err) {
     throw new Error(`Erro na fórmula: ${(err as Error).message}`);
   }
+}
+
+export interface FormulaBreakdown {
+  unitPrice: number;
+  materialValue: number;
+  acabamentoValue: number;
+  instalacaoValue: number;
+}
+
+// Calcula o preço e detalha quanto do valor é material x acabamento/frontão x
+// instalação — comparando o resultado da fórmula com cada termo opcional
+// ligado/desligado. Funciona mesmo com fórmulas customizadas, desde que sigam a
+// convenção de multiplicar o termo pela variável includeAcabamento/
+// includeInstalacao. materialValue absorve o restante, então os três valores
+// sempre somam exatamente o unitPrice, mesmo se a fórmula não for perfeitamente
+// aditiva. Usada tanto ao salvar o orçamento quanto na prévia (preview público),
+// pra garantir que o detalhamento mostrado ao cliente/admin bate com o valor real.
+export function evaluateFormulaBreakdown(
+  expression: string,
+  baseVars: { width: number; height: number; thickness: number; pricePerM2: number; quantity: number },
+  includeAcabamento: boolean,
+  includeInstalacao: boolean
+): FormulaBreakdown {
+  const unitPrice = evaluateFormula(expression, {
+    ...baseVars,
+    includeAcabamento: includeAcabamento ? 1 : 0,
+    includeInstalacao: includeInstalacao ? 1 : 0,
+  });
+  const baseOnly = evaluateFormula(expression, { ...baseVars, includeAcabamento: 0, includeInstalacao: 0 });
+  const acabamentoValue = includeAcabamento
+    ? Math.max(0, evaluateFormula(expression, { ...baseVars, includeAcabamento: 1, includeInstalacao: 0 }) - baseOnly)
+    : 0;
+  const instalacaoValue = includeInstalacao
+    ? Math.max(0, evaluateFormula(expression, { ...baseVars, includeAcabamento: 0, includeInstalacao: 1 }) - baseOnly)
+    : 0;
+  const materialValue = Math.max(0, unitPrice - acabamentoValue - instalacaoValue);
+
+  return { unitPrice, materialValue, acabamentoValue, instalacaoValue };
 }
 
 export const FORMULA_VARIABLE_DOCS = [
