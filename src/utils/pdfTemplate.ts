@@ -29,22 +29,17 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
         : '';
       const priceOnRequestLabel =
         item.marble.pricePerM2 == null
-          ? '<br/><span style="font-size:10px;color:#6B6560;">Aproximadamente (preço sob consulta)</span>'
+          ? '<br/><span style="font-size:10px;color:#B42318;font-weight:bold;">VALOR INCOMPLETO — material sob consulta, não incluído</span>'
           : '';
-      // Detalha quanto do total é material x acabamento/frontão x instalação —
-      // só aparece quando algum desses serviços foi incluído no item. Os valores
-      // já vêm multiplicados pela quantidade, pra bater com a coluna "Total".
-      const serviceParts: string[] = [`Material: ${formatCurrency(item.materialValue * item.quantity)}`];
-      if (item.includeAcabamento) {
-        serviceParts.push(`Acabamento/frontão: ${formatCurrency(item.acabamentoValue * item.quantity)}`);
-      }
-      if (item.includeInstalacao) {
-        serviceParts.push(`Instalação: ${formatCurrency(item.instalacaoValue * item.quantity)}`);
-      }
-      const breakdownLabel =
-        item.includeAcabamento || item.includeInstalacao
-          ? `<br/><span style="font-size:10px;color:#6B6560;">${serviceParts.join(' · ')}</span>`
-          : '';
+      // O PDF vai para o cliente: só informa QUAIS serviços foram somados ao
+      // total do item, sem mostrar o valor de cada um. O detalhamento em R$ de
+      // acabamento/frontão e instalação fica só no admin.
+      const services: string[] = [];
+      if (item.includeAcabamento) services.push('acabamento/frontão');
+      if (item.includeInstalacao) services.push('instalação');
+      const breakdownLabel = services.length
+        ? `<br/><span style="font-size:10px;color:#6B6560;">Inclui ${services.join(' e ')} (já somado ao total)</span>`
+        : '';
       return `
       <tr>
         <td>${item.description ?? '-'}${breakdownLabel}${extrasLabel}</td>
@@ -56,6 +51,20 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       </tr>`;
     })
     .join('');
+
+  // Mármore com preço "sob consulta" entra no cálculo com R$ 0/m², então o
+  // total do PDF fica bem abaixo do real — precisa ficar evidente pro cliente.
+  const priceOnRequestMarbles = Array.from(
+    new Set(quote.items.filter((i) => i.marble.pricePerM2 == null).map((i) => i.marble.name))
+  );
+  const hasPriceOnRequest = priceOnRequestMarbles.length > 0;
+  const incompleteBanner = hasPriceOnRequest
+    ? `<div class="incomplete-banner">
+        <strong>ATENÇÃO: ORÇAMENTO COM VALOR INCOMPLETO</strong><br/>
+        O preço de ${priceOnRequestMarbles.join(', ')} é sob consulta e <strong>não está incluído</strong> nos valores
+        abaixo. O total deste orçamento está abaixo do valor real — entre em contato para receber o valor final.
+      </div>`
+    : '';
 
   return `
   <!DOCTYPE html>
@@ -77,6 +86,8 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       .totals { margin-top: 16px; width: 280px; margin-left: auto; }
       .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
       .totals .total { font-weight: bold; font-size: 16px; border-top: 2px solid #1A1614; padding-top: 8px; margin-top: 4px; }
+      .incomplete-banner { margin: 16px 0; padding: 12px 16px; border: 2px solid #B42318; background: #FEF3F2; color: #B42318; border-radius: 8px; font-size: 12px; line-height: 1.5; }
+      .incomplete-note { color: #B42318; font-size: 11px; font-weight: bold; text-align: right; margin-top: 6px; }
       .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 11px; color: #6B6560; }
     </style>
   </head>
@@ -105,6 +116,8 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
     <div>Telefone: ${clientPhone}</div>
     <div>Email: ${clientEmail}</div>
 
+    ${incompleteBanner}
+
     <div class="section-title">Itens do Orçamento</div>
     <table>
       <thead>
@@ -121,7 +134,12 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
           ? `<div><span>Frete${quote.freightDistanceKm ? ` (${quote.freightDistanceKm}km)` : ''}:</span><span>${formatCurrency(quote.freight)}</span></div>`
           : ''
       }
-      <div class="total"><span>TOTAL:</span><span>${formatCurrency(quote.total)}</span></div>
+      <div class="total"><span>${hasPriceOnRequest ? 'TOTAL PARCIAL*' : 'TOTAL'}:</span><span>${formatCurrency(quote.total)}</span></div>
+      ${
+        hasPriceOnRequest
+          ? '<div class="incomplete-note">* Valor incompleto: não inclui o material com preço sob consulta.</div>'
+          : ''
+      }
     </div>
 
     ${quote.notes ? `<div class="section-title">Observações</div><div>${quote.notes}</div>` : ''}

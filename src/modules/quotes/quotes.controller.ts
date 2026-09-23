@@ -154,6 +154,14 @@ export async function create(req: Request, res: Response) {
     include: { items: true },
   });
 
+  // Orçamento público (sem login): não devolve o detalhamento por item
+  // (acabamento/frontão, instalação) — só o admin vê esses valores.
+  if (!req.user) {
+    return res.status(201).json({
+      quote: { id: quote.id, quoteNumber: quote.quoteNumber, subtotal: quote.subtotal, total: quote.total },
+    });
+  }
+
   res.status(201).json({ quote });
 }
 

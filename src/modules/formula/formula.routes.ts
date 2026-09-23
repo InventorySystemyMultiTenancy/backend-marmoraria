@@ -8,9 +8,11 @@ const router = Router();
 router.get('/', requireAuth, asyncHandler(formulaController.getActive));
 router.get('/history', requireAuth, asyncHandler(formulaController.getHistory));
 router.post('/test', requireAuth, asyncHandler(formulaController.test));
-// Sem auth: usada pela prévia de preço tanto no admin quanto no orçamento
-// público do site (self-service), e não expõe a fórmula em si, só o resultado.
-router.post('/preview/public', asyncHandler(formulaController.previewPrice));
+// Sem auth: prévia de preço do orçamento público do site (self-service). Não
+// expõe a fórmula nem o detalhamento de acabamento/instalação, só o total.
+router.post('/preview/public', asyncHandler(formulaController.previewPricePublic));
+// Com auth: prévia do admin, com detalhamento material/acabamento/instalação.
+router.post('/preview', requireAuth, asyncHandler(formulaController.previewPrice));
 router.put('/', requireAuth, requireRole('MASTER'), asyncHandler(formulaController.update));
 
 export default router;

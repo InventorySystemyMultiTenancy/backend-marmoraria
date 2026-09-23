@@ -6,7 +6,9 @@ import {
   evaluateFormulaBreakdown,
   FORMULA_VARIABLE_DOCS,
   DEFAULT_FORMULA_EXPRESSION,
+  LEGACY_DEFAULT_FORMULA_EXPRESSIONS,
 } from '../../utils/formulaEngine';
+import { logger } from '../../utils/logger';
 import { AppError } from '../../middlewares/errorHandler';
 
 const updateSchema = z.object({
@@ -69,14 +71,45 @@ export async function test(req: Request, res: Response) {
 
 // Usada pela prévia de orçamento (admin e formulário público): calcula o preço
 // com a MESMA fórmula ativa que o backend usa ao salvar o orçamento e gerar o
-// PDF, para a prévia nunca divergir do valor final. Também devolve o
-// detalhamento (material/acabamento/instalação) pra explicar ao cliente/admin
-// de onde vem o valor, sem expor o texto da fórmula em si.
-export async function previewPrice(req: Request, res: Response) {
-  const { includeAcabamento, includeInstalacao, ...variables } = previewSchema.parse(req.body);
+// PDF, para a prévia nunca divergir do valor final.
+async function computePreview(body: unknown) {
+  const { includeAcabamento, includeInstalacao, ...variables } = previewSchema.parse(body);
   const expression = await getCurrentExpression();
-  const breakdown = evaluateFormulaBreakdown(expression, variables, includeAcabamento, includeInstalacao);
+  return evaluateFormulaBreakdown(expression, variables, includeAcabamento, includeInstalacao);
+}
+
+// Versão pública (formulário do site): devolve só o valor somado. O detalhamento
+// de acabamento/frontão e instalação é informação interna — só o admin vê.
+export async function previewPricePublic(req: Request, res: Response) {
+  const breakdown = await computePreview(req.body);
+  res.json({ result: breakdown.unitPrice });
+}
+
+// Versão autenticada (admin): inclui o detalhamento material/acabamento/instalação.
+export async function previewPrice(req: Request, res: Response) {
+  const breakdown = await computePreview(req.body);
   res.json({ result: breakdown.unitPrice, ...breakdown });
+}
+
+// Se a fórmula ativa ainda é a padrão antiga (acabamento fixo em R$ 110/ml),
+// troca pela padrão nova (acabamento = 20% do m²). Roda uma vez no startup.
+export async function upgradeLegacyDefaultFormula() {
+  const active = await prisma.formulaConfig.findFirst({
+    where: { isActive: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (!active || !LEGACY_DEFAULT_FORMULA_EXPRESSIONS.includes(active.expression.trim())) return;
+
+  await prisma.formulaConfig.updateMany({ where: { isActive: true }, data: { isActive: false } });
+  await prisma.formulaConfig.create({
+    data: {
+      expression: DEFAULT_FORMULA_EXPRESSION,
+      variables: FORMULA_VARIABLE_DOCS,
+      description: 'Fórmula padrão: acabamento/frontão = 20% do m² por metro linear',
+      isActive: true,
+    },
+  });
+  logger.info('Fórmula padrão antiga substituída: acabamento/frontão agora é 20% do m² por metro linear');
 }
 
 export async function update(req: Request, res: Response) {
