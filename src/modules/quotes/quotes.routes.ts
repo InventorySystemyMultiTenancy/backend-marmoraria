@@ -22,6 +22,12 @@ router.patch(
   asyncHandler(controller.updateItemValues)
 );
 router.patch(
+  '/:id/discount',
+  requireAuth,
+  requirePermission('quotes_edit'),
+  asyncHandler(controller.updateDiscount)
+);
+router.patch(
   '/:id/status',
   requireAuth,
   requirePermission('quotes_approve'),

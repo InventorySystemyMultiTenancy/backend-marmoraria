@@ -281,6 +281,47 @@ export async function updateItemValues(req: Request, res: Response) {
   res.json({ quote: updated });
 }
 
+const updateDiscountSchema = z.object({
+  discount: z.number().nonnegative(),
+  discountPct: z.number().min(0).max(100),
+});
+
+// Ajusta o desconto (R$ e/ou %) de um orçamento já criado, pela tela de
+// detalhe no admin, recalculando o total. Se o orçamento já foi aprovado, o
+// lançamento de receita do pedido acompanha o novo total.
+export async function updateDiscount(req: Request, res: Response) {
+  const { discount, discountPct } = updateDiscountSchema.parse(req.body);
+
+  const existing = await prisma.quote.findUnique({ where: { id: req.params.id }, include: { order: true } });
+  if (!existing) throw new AppError('Orçamento não encontrado', 404);
+
+  const pctDiscountValue = existing.subtotal * (discountPct / 100);
+  if (discount + pctDiscountValue > existing.subtotal) {
+    throw new AppError('O desconto não pode ser maior que o subtotal do orçamento', 400);
+  }
+  const total = Math.max(0, existing.subtotal - discount - pctDiscountValue + existing.freight);
+
+  const quote = await prisma.quote.update({
+    where: { id: req.params.id },
+    data: { discount, discountPct, total },
+    include: {
+      client: true,
+      createdBy: { select: { name: true } },
+      items: { include: { marble: { select: { name: true, imageUrls: true, pricePerM2: true } } } },
+      order: true,
+    },
+  });
+
+  if (existing.order) {
+    await prisma.financialEntry.updateMany({
+      where: { orderId: existing.order.id, type: 'INCOME', category: 'Venda' },
+      data: { amount: total },
+    });
+  }
+
+  res.json({ quote });
+}
+
 export async function updateStatus(req: Request, res: Response) {
   const { status, clientCpfCnpj } = z
     .object({
