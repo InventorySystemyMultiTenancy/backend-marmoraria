@@ -22,7 +22,9 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
   const rows = quote.items
     .map((item) => {
       const extras = Array.isArray(item.extras) ? (item.extras as { name: string; price: number }[]) : [];
-      const extrasLabel = extras.length
+      // O custo adicional só é detalhado se o admin marcou "mostrar custo
+      // adicional". Oculto ou não, ele já está somado no total do item.
+      const extrasLabel = quote.showExtras && extras.length
         ? `<br/><span style="font-size:10px;color:#6B6560;">+ ${extras
             .map((e) => `${e.name} (${formatCurrency(e.price)})`)
             .join(', ')}</span>`

@@ -142,6 +142,11 @@ model Quote {
   freightDistanceKm Float?
   total             Float  @default(0)
 
+  // Se o custo adicional (extras dos itens, ex: cuba de inox) aparece no PDF e
+  // no acompanhamento do pedido pro cliente. Mesmo oculto, ele continua somado
+  // no total do item e do orçamento — só não é detalhado.
+  showExtras Boolean @default(false)
+
   notes      String?
   validUntil DateTime?
   pdfUrl     String?

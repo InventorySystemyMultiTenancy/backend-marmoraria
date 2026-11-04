@@ -27,6 +27,13 @@ router.patch(
   requirePermission('quotes_edit'),
   asyncHandler(controller.updateDiscount)
 );
+// Mostrar ou não o custo adicional (extras) no PDF e no acompanhamento do cliente.
+router.patch(
+  '/:id/show-extras',
+  requireAuth,
+  requirePermission('quotes_edit'),
+  asyncHandler(controller.updateShowExtras)
+);
 router.patch(
   '/:id/status',
   requireAuth,

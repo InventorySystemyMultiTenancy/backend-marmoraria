@@ -33,6 +33,8 @@ const createQuoteSchema = z.object({
   discountPct: z.number().min(0).max(100).default(0),
   freight: z.number().nonnegative().default(0),
   freightDistanceKm: z.number().nonnegative().optional(),
+  // Custo adicional (extras) só aparece no PDF/acompanhamento se marcado.
+  showExtras: z.boolean().default(false),
   notes: z.string().optional(),
   validUntil: z.string().optional(),
   source: z.enum(['ADMIN', 'SELF_SERVICE']).default('ADMIN'),
@@ -128,6 +130,7 @@ export async function create(req: Request, res: Response) {
       freight: data.freight,
       freightDistanceKm: data.freightDistanceKm,
       total,
+      showExtras: data.showExtras,
       notes: data.notes,
       validUntil: data.validUntil ? new Date(data.validUntil) : addBusinessDays(new Date(), 10),
       source: data.source,
@@ -192,6 +195,7 @@ export async function update(req: Request, res: Response) {
         discountPct: data.discountPct,
         freight: data.freight,
         freightDistanceKm: data.freightDistanceKm,
+        showExtras: data.showExtras,
         notes: data.notes,
         subtotal,
         total,
@@ -228,6 +232,7 @@ export async function update(req: Request, res: Response) {
       clientPhone: data.clientPhone,
       clientEmail: data.clientEmail || undefined,
       clientCpfCnpj: data.clientCpfCnpj ? onlyDigits(data.clientCpfCnpj) : undefined,
+      showExtras: data.showExtras,
       notes: data.notes,
     },
   });
@@ -238,12 +243,34 @@ const updateItemValuesSchema = z.object({
   materialValue: z.number().nonnegative().optional(),
   acabamentoValue: z.number().nonnegative().optional(),
   instalacaoValue: z.number().nonnegative().optional(),
+  // Custo adicional do item (ex: cuba de inox). Se omitido, mantém o atual.
+  extras: z.array(z.object({ name: z.string().min(1), price: z.number().nonnegative() })).optional(),
 });
+
+const quoteDetailInclude = {
+  client: true,
+  createdBy: { select: { name: true } },
+  items: { include: { marble: { select: { name: true, imageUrls: true, pricePerM2: true } } } },
+  order: true,
+} as const;
+
+// Se o orçamento já virou pedido, a receita foi lançada na aprovação — o
+// lançamento precisa acompanhar o novo total pra não ficar divergente.
+async function syncOrderRevenue(quoteId: string, total: number) {
+  const order = await prisma.order.findUnique({ where: { quoteId } });
+  if (!order) return;
+  await prisma.financialEntry.updateMany({
+    where: { orderId: order.id, type: 'INCOME', category: 'Venda' },
+    data: { amount: total },
+  });
+}
 
 // Só o MASTER pode ajustar manualmente o valor de material/acabamento/instalação
 // de um item — inclusive em orçamentos já aprovados —, por exemplo pra dar um
 // desconto pontual num serviço sem mexer na fórmula geral. Campos omitidos
 // mantêm o valor calculado (o "valor base"); só os informados são sobrescritos.
+// Vale também para pedidos (orçamentos aprovados): a tela do pedido usa esta
+// mesma rota, e o lançamento de receita acompanha o novo total.
 export async function updateItemValues(req: Request, res: Response) {
   const data = updateItemValuesSchema.parse(req.body);
 
@@ -256,13 +283,21 @@ export async function updateItemValues(req: Request, res: Response) {
   const acabamentoValue = data.acabamentoValue ?? item.acabamentoValue;
   const instalacaoValue = data.instalacaoValue ?? item.instalacaoValue;
   const unitPrice = materialValue + acabamentoValue + instalacaoValue;
-  const extras = (item.extras as { name: string; price: number }[] | null) ?? [];
+  const extras = data.extras ?? (item.extras as { name: string; price: number }[] | null) ?? [];
   const extrasTotal = extras.reduce((sum, e) => sum + e.price, 0);
   const totalPrice = unitPrice * item.quantity + extrasTotal;
 
   await prisma.quoteItem.update({
     where: { id: item.id },
-    data: { materialValue, acabamentoValue, instalacaoValue, unitPrice, totalPrice, valuesOverridden: true },
+    data: {
+      materialValue,
+      acabamentoValue,
+      instalacaoValue,
+      unitPrice,
+      totalPrice,
+      extras,
+      valuesOverridden: true,
+    },
   });
 
   const quote = await prisma.quote.findUnique({ where: { id: req.params.id }, include: { items: true } });
@@ -275,10 +310,29 @@ export async function updateItemValues(req: Request, res: Response) {
   const updated = await prisma.quote.update({
     where: { id: req.params.id },
     data: { subtotal, total },
-    include: { items: { include: { marble: { select: { name: true, imageUrls: true, pricePerM2: true } } } } },
+    include: quoteDetailInclude,
   });
 
+  await syncOrderRevenue(req.params.id, total);
+
   res.json({ quote: updated });
+}
+
+// Liga/desliga a exibição do custo adicional (extras) no PDF e no
+// acompanhamento do pedido. Não mexe em valores: o total já inclui os extras.
+export async function updateShowExtras(req: Request, res: Response) {
+  const { showExtras } = z.object({ showExtras: z.boolean() }).parse(req.body);
+
+  const existing = await prisma.quote.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new AppError('Orçamento não encontrado', 404);
+
+  const quote = await prisma.quote.update({
+    where: { id: req.params.id },
+    data: { showExtras },
+    include: quoteDetailInclude,
+  });
+
+  res.json({ quote });
 }
 
 const updateDiscountSchema = z.object({
@@ -304,20 +358,10 @@ export async function updateDiscount(req: Request, res: Response) {
   const quote = await prisma.quote.update({
     where: { id: req.params.id },
     data: { discount, discountPct, total },
-    include: {
-      client: true,
-      createdBy: { select: { name: true } },
-      items: { include: { marble: { select: { name: true, imageUrls: true, pricePerM2: true } } } },
-      order: true,
-    },
+    include: quoteDetailInclude,
   });
 
-  if (existing.order) {
-    await prisma.financialEntry.updateMany({
-      where: { orderId: existing.order.id, type: 'INCOME', category: 'Venda' },
-      data: { amount: total },
-    });
-  }
+  await syncOrderRevenue(req.params.id, total);
 
   res.json({ quote });
 }

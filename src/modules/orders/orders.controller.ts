@@ -244,6 +244,7 @@ export async function trackOrder(req: Request, res: Response) {
         discountPct: order.quote.discountPct,
         freight: order.quote.freight,
         total: order.quote.total,
+        showExtras: order.quote.showExtras,
         items: order.quote.items.map((item) => ({
           marbleName: item.marble.name,
           marbleImage: item.marble.imageUrls[0] ?? null,
@@ -253,7 +254,12 @@ export async function trackOrder(req: Request, res: Response) {
           thicknessMm: item.thicknessMm,
           quantity: item.quantity,
           areaM2: item.areaM2,
+          // totalPrice já inclui o custo adicional; o detalhamento só é enviado
+          // ao cliente se o admin marcou para mostrar.
           totalPrice: item.totalPrice,
+          extras: order.quote.showExtras && Array.isArray(item.extras)
+            ? (item.extras as { name: string; price: number }[])
+            : [],
         })),
       },
     })),
