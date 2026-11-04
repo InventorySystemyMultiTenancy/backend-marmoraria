@@ -147,6 +147,12 @@ model Quote {
   // no total do item e do orçamento — só não é detalhado.
   showExtras Boolean @default(false)
 
+  // Informações opcionais do orçamento — cada uma só aparece no PDF se preenchida.
+  projectName       String?
+  paymentConditions String? // formas de pagamento (ex: Pix, cartão em 3x)
+  paymentTerm       String? // prazo de pagamento (ex: 50% entrada + 50% na entrega)
+  deliveryTerm      String? // prazo para ficar pronto (ex: 15 dias úteis)
+
   notes      String?
   validUntil DateTime?
   pdfUrl     String?

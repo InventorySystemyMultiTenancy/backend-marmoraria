@@ -35,10 +35,29 @@ const createQuoteSchema = z.object({
   freightDistanceKm: z.number().nonnegative().optional(),
   // Custo adicional (extras) só aparece no PDF/acompanhamento se marcado.
   showExtras: z.boolean().default(false),
+  projectName: z.string().trim().max(200).optional(),
+  paymentConditions: z.string().trim().max(1000).optional(),
+  paymentTerm: z.string().trim().max(1000).optional(),
+  deliveryTerm: z.string().trim().max(1000).optional(),
   notes: z.string().optional(),
   validUntil: z.string().optional(),
   source: z.enum(['ADMIN', 'SELF_SERVICE']).default('ADMIN'),
 });
+
+type QuoteInfoInput = Partial<
+  Pick<z.infer<typeof createQuoteSchema>, 'projectName' | 'paymentConditions' | 'paymentTerm' | 'deliveryTerm'>
+>;
+
+// Campo vazio vira null (some do PDF); campo omitido (undefined) não é alterado.
+function quoteInfoFields(data: QuoteInfoInput) {
+  const norm = (v: string | undefined) => (v === undefined ? undefined : v || null);
+  return {
+    projectName: norm(data.projectName),
+    paymentConditions: norm(data.paymentConditions),
+    paymentTerm: norm(data.paymentTerm),
+    deliveryTerm: norm(data.deliveryTerm),
+  };
+}
 
 export async function list(req: Request, res: Response) {
   const { page, limit, skip } = paginationParams(req.query as Record<string, unknown>);
@@ -131,6 +150,7 @@ export async function create(req: Request, res: Response) {
       freightDistanceKm: data.freightDistanceKm,
       total,
       showExtras: data.showExtras,
+      ...quoteInfoFields(data),
       notes: data.notes,
       validUntil: data.validUntil ? new Date(data.validUntil) : addBusinessDays(new Date(), 10),
       source: data.source,
@@ -196,6 +216,7 @@ export async function update(req: Request, res: Response) {
         freight: data.freight,
         freightDistanceKm: data.freightDistanceKm,
         showExtras: data.showExtras,
+        ...quoteInfoFields(data),
         notes: data.notes,
         subtotal,
         total,
@@ -233,6 +254,7 @@ export async function update(req: Request, res: Response) {
       clientEmail: data.clientEmail || undefined,
       clientCpfCnpj: data.clientCpfCnpj ? onlyDigits(data.clientCpfCnpj) : undefined,
       showExtras: data.showExtras,
+      ...quoteInfoFields(data),
       notes: data.notes,
     },
   });

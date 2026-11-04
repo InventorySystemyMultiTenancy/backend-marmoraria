@@ -9,6 +9,15 @@ function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/\n/g, '<br/>');
+}
+
 function formatDate(date: Date | null | undefined) {
   if (!date) return '-';
   return new Date(date).toLocaleDateString('pt-BR');
@@ -68,6 +77,17 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       </div>`
     : '';
 
+  // Condições comerciais opcionais: cada linha só aparece se foi preenchida.
+  const conditions = [
+    ['Formas de pagamento', quote.paymentConditions],
+    ['Prazo de pagamento', quote.paymentTerm],
+    ['Prazo para ficar pronto', quote.deliveryTerm],
+  ].filter((c): c is [string, string] => Boolean(c[1]?.trim()));
+  const conditionsSection = conditions.length
+    ? `<div class="section-title">Condições</div>
+      ${conditions.map(([label, value]) => `<div class="condition"><strong>${label}:</strong> ${escapeHtml(value)}</div>`).join('')}`
+    : '';
+
   return `
   <!DOCTYPE html>
   <html lang="pt-BR">
@@ -90,6 +110,7 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       .totals .total { font-weight: bold; font-size: 16px; border-top: 2px solid #1A1614; padding-top: 8px; margin-top: 4px; }
       .incomplete-banner { margin: 16px 0; padding: 12px 16px; border: 2px solid #B42318; background: #FEF3F2; color: #B42318; border-radius: 8px; font-size: 12px; line-height: 1.5; }
       .incomplete-note { color: #B42318; font-size: 11px; font-weight: bold; text-align: right; margin-top: 6px; }
+      .condition { margin-bottom: 4px; line-height: 1.5; }
       .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 11px; color: #6B6560; }
     </style>
   </head>
@@ -112,6 +133,8 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       <div><strong>Data:</strong> ${formatDate(quote.createdAt)}</div>
       <div><strong>Válido até:</strong> ${formatDate(quote.validUntil)}</div>
     </div>
+
+    ${quote.projectName?.trim() ? `<div class="section-title">Projeto</div><div>${escapeHtml(quote.projectName)}</div>` : ''}
 
     <div class="section-title">Cliente</div>
     <div>Nome: ${clientName}</div>
@@ -143,6 +166,8 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
           : ''
       }
     </div>
+
+    ${conditionsSection}
 
     ${quote.notes ? `<div class="section-title">Observações</div><div>${quote.notes}</div>` : ''}
 
