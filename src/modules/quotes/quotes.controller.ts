@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
-import { addBusinessDays, isValidCpfCnpj, onlyDigits, paginationParams } from '../../utils/helpers';
+import { addBusinessDays, calcAreaM2, isValidCpfCnpj, onlyDigits, paginationParams } from '../../utils/helpers';
 import { AppError } from '../../middlewares/errorHandler';
 import * as quotesService from './quotes.service';
 
@@ -262,6 +262,14 @@ export async function update(req: Request, res: Response) {
 }
 
 const updateItemValuesSchema = z.object({
+  // Dimensões/quantidade da peça. Se omitidas, mantêm as atuais. Os valores
+  // (material/acabamento/instalação) vêm já recalculados pelo front a partir da
+  // prévia da fórmula — aqui só recalculamos a área e os totais.
+  description: z.string().trim().max(500).optional(),
+  widthCm: z.number().positive().optional(),
+  heightCm: z.number().positive().optional(),
+  thicknessMm: z.number().positive().optional(),
+  quantity: z.number().int().positive().optional(),
   materialValue: z.number().nonnegative().optional(),
   acabamentoValue: z.number().nonnegative().optional(),
   instalacaoValue: z.number().nonnegative().optional(),
@@ -305,13 +313,23 @@ export async function updateItemValues(req: Request, res: Response) {
   const acabamentoValue = data.acabamentoValue ?? item.acabamentoValue;
   const instalacaoValue = data.instalacaoValue ?? item.instalacaoValue;
   const unitPrice = materialValue + acabamentoValue + instalacaoValue;
+  const widthCm = data.widthCm ?? item.widthCm;
+  const heightCm = data.heightCm ?? item.heightCm;
+  const thicknessMm = data.thicknessMm ?? item.thicknessMm;
+  const quantity = data.quantity ?? item.quantity;
   const extras = data.extras ?? (item.extras as { name: string; price: number }[] | null) ?? [];
   const extrasTotal = extras.reduce((sum, e) => sum + e.price, 0);
-  const totalPrice = unitPrice * item.quantity + extrasTotal;
+  const totalPrice = unitPrice * quantity + extrasTotal;
 
   await prisma.quoteItem.update({
     where: { id: item.id },
     data: {
+      ...(data.description !== undefined ? { description: data.description || null } : {}),
+      widthCm,
+      heightCm,
+      thicknessMm,
+      quantity,
+      areaM2: calcAreaM2(widthCm, heightCm),
       materialValue,
       acabamentoValue,
       instalacaoValue,
