@@ -24,6 +24,7 @@ const updateOrderSchema = z.object({
   estimatedDate: z.string().optional(),
   completedDate: z.string().optional(),
   productionNotes: z.string().optional(),
+  name: z.string().trim().max(200).nullable().optional(),
   materialCost: z.number().nonnegative().optional(),
   laborCost: z.number().nonnegative().optional(),
 });
@@ -78,6 +79,8 @@ export async function update(req: Request, res: Response) {
       status: data.status,
       assignedToId: data.assignedToId,
       productionNotes: data.productionNotes,
+      // Nome vazio volta a mostrar só o número do pedido.
+      name: data.name === undefined ? undefined : data.name || null,
       materialCost: data.materialCost,
       laborCost: data.laborCost,
       startDate: data.startDate ? new Date(data.startDate) : undefined,

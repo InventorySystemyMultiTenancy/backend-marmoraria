@@ -33,6 +33,8 @@ const createQuoteSchema = z.object({
   discountPct: z.number().min(0).max(100).default(0),
   freight: z.number().nonnegative().default(0),
   freightDistanceKm: z.number().nonnegative().optional(),
+  freightRatePerKm: z.number().nonnegative().optional(),
+  deliveryAddress: z.string().trim().max(500).optional(),
   // Custo adicional (extras) só aparece no PDF/acompanhamento se marcado.
   showExtras: z.boolean().default(false),
   projectName: z.string().trim().max(200).optional(),
@@ -148,6 +150,8 @@ export async function create(req: Request, res: Response) {
       discountPct: data.discountPct,
       freight: data.freight,
       freightDistanceKm: data.freightDistanceKm,
+      freightRatePerKm: data.freightRatePerKm,
+      deliveryAddress: data.deliveryAddress || undefined,
       total,
       showExtras: data.showExtras,
       ...quoteInfoFields(data),
@@ -215,6 +219,8 @@ export async function update(req: Request, res: Response) {
         discountPct: data.discountPct,
         freight: data.freight,
         freightDistanceKm: data.freightDistanceKm,
+        freightRatePerKm: data.freightRatePerKm,
+        deliveryAddress: data.deliveryAddress,
         showExtras: data.showExtras,
         ...quoteInfoFields(data),
         notes: data.notes,
@@ -265,6 +271,8 @@ const updateItemValuesSchema = z.object({
   // Dimensões/quantidade da peça. Se omitidas, mantêm as atuais. Os valores
   // (material/acabamento/instalação) vêm já recalculados pelo front a partir da
   // prévia da fórmula — aqui só recalculamos a área e os totais.
+  // Troca do material (mármore) da peça. Se omitido, mantém o atual.
+  marbleId: z.string().min(1).optional(),
   description: z.string().trim().max(500).optional(),
   widthCm: z.number().positive().optional(),
   heightCm: z.number().positive().optional(),
@@ -309,6 +317,11 @@ export async function updateItemValues(req: Request, res: Response) {
     throw new AppError('Item do orçamento não encontrado', 404);
   }
 
+  if (data.marbleId && data.marbleId !== item.marbleId) {
+    const marble = await prisma.marble.findUnique({ where: { id: data.marbleId }, select: { id: true } });
+    if (!marble) throw new AppError('Mármore não encontrado', 404);
+  }
+
   const materialValue = data.materialValue ?? item.materialValue;
   const acabamentoValue = data.acabamentoValue ?? item.acabamentoValue;
   const instalacaoValue = data.instalacaoValue ?? item.instalacaoValue;
@@ -324,6 +337,7 @@ export async function updateItemValues(req: Request, res: Response) {
   await prisma.quoteItem.update({
     where: { id: item.id },
     data: {
+      ...(data.marbleId ? { marbleId: data.marbleId } : {}),
       ...(data.description !== undefined ? { description: data.description || null } : {}),
       widthCm,
       heightCm,
@@ -371,6 +385,51 @@ export async function updateShowExtras(req: Request, res: Response) {
     data: { showExtras },
     include: quoteDetailInclude,
   });
+
+  res.json({ quote });
+}
+
+const updateFreightSchema = z.object({
+  deliveryAddress: z.string().trim().max(500).nullable().optional(),
+  freightDistanceKm: z.number().nonnegative().nullable().optional(),
+  freightRatePerKm: z.number().nonnegative().nullable().optional(),
+  // Frete manual: usado só quando não há distância + taxa por km.
+  freight: z.number().nonnegative().optional(),
+});
+
+// Edita endereço de entrega, distância e frete de um orçamento já criado,
+// recalculando o total. Se há distância e taxa por km, o frete é
+// distância × taxa; senão, vale o frete manual informado. Se o orçamento já
+// foi aprovado, o lançamento de receita do pedido acompanha o novo total.
+export async function updateFreight(req: Request, res: Response) {
+  const data = updateFreightSchema.parse(req.body);
+
+  const existing = await prisma.quote.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new AppError('Orçamento não encontrado', 404);
+
+  const distance = data.freightDistanceKm ?? null;
+  const rate = data.freightRatePerKm ?? null;
+  const freight =
+    distance != null && rate != null && distance > 0 && rate > 0
+      ? Math.round(distance * rate * 100) / 100
+      : data.freight ?? 0;
+
+  const pctDiscountValue = existing.subtotal * (existing.discountPct / 100);
+  const total = Math.max(0, existing.subtotal - existing.discount - pctDiscountValue + freight);
+
+  const quote = await prisma.quote.update({
+    where: { id: req.params.id },
+    data: {
+      deliveryAddress: data.deliveryAddress === undefined ? undefined : data.deliveryAddress || null,
+      freightDistanceKm: distance,
+      freightRatePerKm: rate,
+      freight,
+      total,
+    },
+    include: quoteDetailInclude,
+  });
+
+  await syncOrderRevenue(req.params.id, total);
 
   res.json({ quote });
 }

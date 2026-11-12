@@ -27,6 +27,13 @@ router.patch(
   requirePermission('quotes_edit'),
   asyncHandler(controller.updateDiscount)
 );
+// Endereço de entrega, distância e frete (recalcula o total).
+router.patch(
+  '/:id/freight',
+  requireAuth,
+  requirePermission('quotes_edit'),
+  asyncHandler(controller.updateFreight)
+);
 // Mostrar ou não o custo adicional (extras) no PDF e no acompanhamento do cliente.
 router.patch(
   '/:id/show-extras',

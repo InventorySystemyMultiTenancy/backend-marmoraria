@@ -140,6 +140,11 @@ model Quote {
   discountPct       Float  @default(0)
   freight           Float  @default(0)
   freightDistanceKm Float?
+  // Taxa por km usada no cálculo do frete (frete = distância × taxa). Nulo
+  // quando o frete foi informado manualmente.
+  freightRatePerKm  Float?
+  // Endereço de entrega/instalação da obra (pode ser diferente do cadastro do cliente).
+  deliveryAddress   String?
   total             Float  @default(0)
 
   // Se o custo adicional (extras dos itens, ex: cuba de inox) aparece no PDF e
@@ -217,6 +222,9 @@ model QuoteItem {
 model Order {
   id           String  @id @default(cuid())
   orderNumber  String  @unique
+  // Nome opcional do pedido (ex: "Cozinha apto 302"), editável na tela do pedido
+  // e exibido no PDF junto do número.
+  name         String?
   quoteId      String  @unique
   quote        Quote   @relation(fields: [quoteId], references: [id])
   assignedToId String?

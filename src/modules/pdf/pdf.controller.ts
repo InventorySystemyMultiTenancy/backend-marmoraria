@@ -27,7 +27,7 @@ async function launchBrowser() {
 export async function generateQuotePdf(req: Request, res: Response) {
   const quote = await prisma.quote.findUnique({
     where: { id: req.params.quoteId },
-    include: { items: { include: { marble: true } }, client: true },
+    include: { items: { include: { marble: true } }, client: true, order: true },
   });
   if (!quote) throw new AppError('Orçamento não encontrado', 404);
 
@@ -43,7 +43,8 @@ export async function generateQuotePdf(req: Request, res: Response) {
 
     const disposition = req.query.download ? 'attachment' : 'inline';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `${disposition}; filename="orcamento-${quote.quoteNumber}.pdf"`);
+    const filename = quote.order ? `pedido-${quote.order.orderNumber}` : `orcamento-${quote.quoteNumber}`;
+    res.setHeader('Content-Disposition', `${disposition}; filename="${filename}.pdf"`);
     res.send(Buffer.from(pdfBytes));
   } finally {
     await browser.close();

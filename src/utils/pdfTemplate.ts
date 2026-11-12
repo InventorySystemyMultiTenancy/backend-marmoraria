@@ -1,8 +1,10 @@
-import { Quote, QuoteItem, Marble, Client, Company } from '@prisma/client';
+import { Quote, QuoteItem, Marble, Client, Company, Order } from '@prisma/client';
 
 type QuoteWithRelations = Quote & {
   items: (QuoteItem & { marble: Marble })[];
   client: Client | null;
+  // Se o orçamento já virou pedido, o PDF sai como "Pedido" (número + nome).
+  order?: Order | null;
 };
 
 function formatCurrency(value: number) {
@@ -80,7 +82,7 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
   // Condições comerciais opcionais: cada linha só aparece se foi preenchida.
   const conditions = [
     ['Formas de pagamento', quote.paymentConditions],
-    ['Prazo de pagamento', quote.paymentTerm],
+    ['Condições de pagamento', quote.paymentTerm],
     ['Prazo para ficar pronto', quote.deliveryTerm],
   ].filter((c): c is [string, string] => Boolean(c[1]?.trim()));
   const conditionsSection = conditions.length
@@ -129,9 +131,15 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
     </div>
 
     <div class="quote-meta">
+      ${
+        quote.order
+          ? `<div><strong>Pedido Nº</strong> ${quote.order.orderNumber}${quote.order.name?.trim() ? ` — ${escapeHtml(quote.order.name)}` : ''}</div>
       <div><strong>Orçamento Nº</strong> ${quote.quoteNumber}</div>
+      <div><strong>Data do pedido:</strong> ${formatDate(quote.order.createdAt)}</div>`
+          : `<div><strong>Orçamento Nº</strong> ${quote.quoteNumber}</div>
       <div><strong>Data:</strong> ${formatDate(quote.createdAt)}</div>
-      <div><strong>Válido até:</strong> ${formatDate(quote.validUntil)}</div>
+      <div><strong>Válido até:</strong> ${formatDate(quote.validUntil)}</div>`
+      }
     </div>
 
     ${quote.projectName?.trim() ? `<div class="section-title">Projeto</div><div>${escapeHtml(quote.projectName)}</div>` : ''}
@@ -140,13 +148,14 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
     <div>Nome: ${clientName}</div>
     <div>Telefone: ${clientPhone}</div>
     <div>Email: ${clientEmail}</div>
+    ${quote.deliveryAddress?.trim() ? `<div>Endereço de entrega: ${escapeHtml(quote.deliveryAddress)}</div>` : ''}
 
     ${incompleteBanner}
 
-    <div class="section-title">Itens do Orçamento</div>
+    <div class="section-title">${quote.order ? 'Itens do Pedido' : 'Itens do Orçamento'}</div>
     <table>
       <thead>
-        <tr><th>Descrição</th><th>Mármore</th><th>Dimensões</th><th>Área</th><th>Qtd.</th><th>Total</th></tr>
+        <tr><th>Descrição</th><th>Material</th><th>Dimensões</th><th>Área</th><th>Qtd.</th><th>Total</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -169,10 +178,10 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
 
     ${conditionsSection}
 
-    ${quote.notes ? `<div class="section-title">Observações</div><div>${quote.notes}</div>` : ''}
+    ${quote.notes?.trim() ? `<div class="section-title">Observações</div><div>${escapeHtml(quote.notes)}</div>` : ''}
 
     <div class="footer">
-      Para confirmar seu pedido, entre em contato:<br/>
+      ${quote.order ? 'Dúvidas sobre seu pedido? Entre em contato:' : 'Para confirmar seu pedido, entre em contato:'}<br/>
       WhatsApp: ${company?.whatsapp ?? '-'}<br/>
       Email: ${company?.email ?? '-'}
     </div>
