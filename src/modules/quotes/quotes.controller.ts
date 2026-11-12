@@ -434,6 +434,64 @@ export async function updateFreight(req: Request, res: Response) {
   res.json({ quote });
 }
 
+const updateClientInfoSchema = z.object({
+  name: z.string().trim().min(2, 'Informe o nome do cliente').max(200),
+  phone: z.string().trim().max(50).optional(),
+  email: z.string().trim().email('Informe um email válido').optional().or(z.literal('')),
+  cpfCnpj: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || isValidCpfCnpj(v), 'Informe um CPF ou CNPJ válido'),
+  // Só existem no cadastro do cliente (cliente avulso não tem esses campos).
+  address: z.string().trim().max(300).optional(),
+  city: z.string().trim().max(100).optional(),
+  state: z.string().trim().max(50).optional(),
+});
+
+// Edita nome e dados do cliente direto da tela do orçamento/pedido. Se o
+// orçamento é de um cliente cadastrado, o cadastro dele também é atualizado
+// (vale pra todos os orçamentos desse cliente) — por isso exige também a
+// permissão de editar clientes. Os dados copiados no próprio orçamento são
+// atualizados junto, pra todas as telas e o PDF mostrarem a mesma coisa.
+export async function updateClientInfo(req: Request, res: Response) {
+  const data = updateClientInfoSchema.parse(req.body);
+
+  const existing = await prisma.quote.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new AppError('Orçamento não encontrado', 404);
+
+  const phone = data.phone || null;
+  const email = data.email || null;
+  const cpfCnpj = data.cpfCnpj ? onlyDigits(data.cpfCnpj) : null;
+
+  if (existing.clientId) {
+    const user = req.user;
+    if (user?.role !== 'MASTER' && !user?.permissions?.clients_edit) {
+      throw new AppError('Você não tem permissão para editar o cadastro do cliente', 403);
+    }
+    await prisma.client.update({
+      where: { id: existing.clientId },
+      data: {
+        name: data.name,
+        phone,
+        email,
+        cpfCnpj,
+        ...(data.address !== undefined ? { address: data.address || null } : {}),
+        ...(data.city !== undefined ? { city: data.city || null } : {}),
+        ...(data.state !== undefined ? { state: data.state || null } : {}),
+      },
+    });
+  }
+
+  const quote = await prisma.quote.update({
+    where: { id: req.params.id },
+    data: { clientName: data.name, clientPhone: phone, clientEmail: email, clientCpfCnpj: cpfCnpj },
+    include: quoteDetailInclude,
+  });
+
+  res.json({ quote });
+}
+
 const updateDiscountSchema = z.object({
   discount: z.number().nonnegative(),
   discountPct: z.number().min(0).max(100),

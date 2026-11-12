@@ -27,6 +27,13 @@ router.patch(
   requirePermission('quotes_edit'),
   asyncHandler(controller.updateDiscount)
 );
+// Nome e dados do cliente (atualiza o cadastro se for cliente cadastrado).
+router.patch(
+  '/:id/client',
+  requireAuth,
+  requirePermission('quotes_edit'),
+  asyncHandler(controller.updateClientInfo)
+);
 // Endereço de entrega, distância e frete (recalcula o total).
 router.patch(
   '/:id/freight',
