@@ -2,6 +2,14 @@ export function calcAreaM2(widthCm: number, heightCm: number): number {
   return (widthCm * heightCm) / 10000;
 }
 
+// Item com mármore "sob consulta": o material entra com R$ 0/m², então
+// qualquer valor do item (mesmo com acabamento, instalação ou extras) seria
+// parcial e enganoso. Para o cliente, esses itens nunca mostram valor — a
+// menos que a equipe já tenha definido o valor manualmente no admin.
+export function isPriceOnRequestItem(item: { valuesOverridden?: boolean | null }, marble: { pricePerM2: number | null }) {
+  return marble.pricePerM2 == null && !item.valuesOverridden;
+}
+
 export async function generateSequentialNumber(
   prefix: string,
   count: number

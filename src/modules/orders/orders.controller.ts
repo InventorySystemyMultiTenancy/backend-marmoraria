@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../config/database';
-import { isValidCpfCnpj, onlyDigits, paginationParams } from '../../utils/helpers';
+import { isPriceOnRequestItem, isValidCpfCnpj, onlyDigits, paginationParams } from '../../utils/helpers';
 import { AppError } from '../../middlewares/errorHandler';
 
 const STAGE_NAMES = ['Aprovado', 'Corte', 'Polimento', 'Acabamento', 'Pronto', 'Entregue'];
@@ -227,7 +227,11 @@ export async function trackOrder(req: Request, res: Response) {
   }
 
   res.json({
-    orders: orders.map((order) => ({
+    orders: orders.map((order) => {
+      // Mármore sob consulta sem valor definido pela equipe: o cliente não vê
+      // valor do item nem os totais (seriam parciais).
+      const onRequest = order.quote.items.some((i) => isPriceOnRequestItem(i, i.marble));
+      return {
       orderNumber: order.orderNumber,
       status: order.status,
       startDate: order.startDate,
@@ -242,13 +246,16 @@ export async function trackOrder(req: Request, res: Response) {
       quote: {
         quoteNumber: order.quote.quoteNumber,
         clientName: order.quote.client?.name ?? order.quote.clientName,
-        subtotal: order.quote.subtotal,
-        discount: order.quote.discount,
-        discountPct: order.quote.discountPct,
-        freight: order.quote.freight,
-        total: order.quote.total,
+        priceOnRequest: onRequest,
+        subtotal: onRequest ? null : order.quote.subtotal,
+        discount: onRequest ? 0 : order.quote.discount,
+        discountPct: onRequest ? 0 : order.quote.discountPct,
+        freight: onRequest ? 0 : order.quote.freight,
+        total: onRequest ? null : order.quote.total,
         showExtras: order.quote.showExtras,
-        items: order.quote.items.map((item) => ({
+        items: order.quote.items.map((item) => {
+          const itemOnRequest = isPriceOnRequestItem(item, item.marble);
+          return {
           marbleName: item.marble.name,
           marbleImage: item.marble.imageUrls[0] ?? null,
           description: item.description,
@@ -259,12 +266,17 @@ export async function trackOrder(req: Request, res: Response) {
           areaM2: item.areaM2,
           // totalPrice já inclui o custo adicional; o detalhamento só é enviado
           // ao cliente se o admin marcou para mostrar.
-          totalPrice: item.totalPrice,
+          totalPrice: itemOnRequest ? null : item.totalPrice,
+          priceOnRequest: itemOnRequest,
           extras: order.quote.showExtras && Array.isArray(item.extras)
-            ? (item.extras as { name: string; price: number }[])
+            ? (item.extras as { name: string; price: number }[]).map((e) =>
+                itemOnRequest ? { name: e.name, price: null } : e
+              )
             : [],
-        })),
+          };
+        }),
       },
-    })),
+      };
+    }),
   });
 }

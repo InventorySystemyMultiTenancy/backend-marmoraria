@@ -1,4 +1,5 @@
 import { Quote, QuoteItem, Marble, Client, Company, Order } from '@prisma/client';
+import { isPriceOnRequestItem } from './helpers';
 
 type QuoteWithRelations = Quote & {
   items: (QuoteItem & { marble: Marble })[];
@@ -35,15 +36,17 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       const extras = Array.isArray(item.extras) ? (item.extras as { name: string; price: number }[]) : [];
       // O custo adicional só é detalhado se o admin marcou "mostrar custo
       // adicional". Oculto ou não, ele já está somado no total do item.
-      const extrasLabel = quote.showExtras && extras.length
+      const onRequest = isPriceOnRequestItem(item, item.marble);
+      const extrasLabel = onRequest && extras.length
+        ? `<br/><span style="font-size:10px;color:#6B6560;">+ ${extras.map((e) => e.name).join(', ')}</span>`
+        : quote.showExtras && extras.length
         ? `<br/><span style="font-size:10px;color:#6B6560;">+ ${extras
             .map((e) => `${e.name} (${formatCurrency(e.price)})`)
             .join(', ')}</span>`
         : '';
-      const priceOnRequestLabel =
-        item.marble.pricePerM2 == null
-          ? '<br/><span style="font-size:10px;color:#B42318;font-weight:bold;">VALOR INCOMPLETO — material sob consulta, não incluído</span>'
-          : '';
+      const priceCell = onRequest
+        ? '<strong>Sob consulta</strong><br/><span style="font-size:10px;color:#6B6560;">mármore sob consulta</span>'
+        : formatCurrency(item.totalPrice);
       // O PDF vai para o cliente: só informa QUAIS serviços foram somados ao
       // total do item, sem mostrar o valor de cada um. O detalhamento em R$ de
       // acabamento/frontão e instalação fica só no admin.
@@ -51,7 +54,7 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       if (item.includeAcabamento) services.push('acabamento/frontão');
       if (item.includeInstalacao) services.push('instalação');
       const breakdownLabel = services.length
-        ? `<br/><span style="font-size:10px;color:#6B6560;">Inclui ${services.join(' e ')} (já somado ao total)</span>`
+        ? `<br/><span style="font-size:10px;color:#6B6560;">Inclui ${services.join(' e ')}${onRequest ? '' : ' (já somado ao total)'}</span>`
         : '';
       return `
       <tr>
@@ -60,22 +63,22 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
         <td>${item.widthCm} x ${item.heightCm} cm (${item.thicknessMm}mm)</td>
         <td>${item.areaM2.toFixed(2)} m²</td>
         <td>${item.quantity}</td>
-        <td>${formatCurrency(item.totalPrice)}${priceOnRequestLabel}</td>
+        <td>${priceCell}</td>
       </tr>`;
     })
     .join('');
 
-  // Mármore com preço "sob consulta" entra no cálculo com R$ 0/m², então o
-  // total do PDF fica bem abaixo do real — precisa ficar evidente pro cliente.
+  // Com qualquer mármore "sob consulta" (sem valor definido pela equipe), o
+  // PDF não mostra subtotal nem total: seriam valores parciais.
   const priceOnRequestMarbles = Array.from(
-    new Set(quote.items.filter((i) => i.marble.pricePerM2 == null).map((i) => i.marble.name))
+    new Set(quote.items.filter((i) => isPriceOnRequestItem(i, i.marble)).map((i) => i.marble.name))
   );
   const hasPriceOnRequest = priceOnRequestMarbles.length > 0;
   const incompleteBanner = hasPriceOnRequest
     ? `<div class="incomplete-banner">
-        <strong>ATENÇÃO: ORÇAMENTO COM VALOR INCOMPLETO</strong><br/>
-        O preço de ${priceOnRequestMarbles.join(', ')} é sob consulta e <strong>não está incluído</strong> nos valores
-        abaixo. O total deste orçamento está abaixo do valor real — entre em contato para receber o valor final.
+        <strong>MÁRMORE SOB CONSULTA</strong><br/>
+        O valor de ${priceOnRequestMarbles.join(', ')} é sob consulta. Entre em contato para receber o valor final
+        deste orçamento.
       </div>`
     : '';
 
@@ -160,7 +163,9 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       <tbody>${rows}</tbody>
     </table>
 
-    <div class="totals">
+    ${hasPriceOnRequest ? `<div class="totals">
+      <div class="total"><span>TOTAL:</span><span>Sob consulta</span></div>
+    </div>` : `<div class="totals">
       <div><span>Subtotal:</span><span>${formatCurrency(quote.subtotal)}</span></div>
       <div><span>Desconto:</span><span>${formatCurrency(quote.discount + (quote.subtotal * quote.discountPct) / 100)}</span></div>
       ${
@@ -168,13 +173,8 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
           ? `<div><span>Frete${quote.freightDistanceKm ? ` (${quote.freightDistanceKm}km)` : ''}:</span><span>${formatCurrency(quote.freight)}</span></div>`
           : ''
       }
-      <div class="total"><span>${hasPriceOnRequest ? 'TOTAL PARCIAL*' : 'TOTAL'}:</span><span>${formatCurrency(quote.total)}</span></div>
-      ${
-        hasPriceOnRequest
-          ? '<div class="incomplete-note">* Valor incompleto: não inclui o material com preço sob consulta.</div>'
-          : ''
-      }
-    </div>
+      <div class="total"><span>TOTAL:</span><span>${formatCurrency(quote.total)}</span></div>
+    </div>`}
 
     ${conditionsSection}
 

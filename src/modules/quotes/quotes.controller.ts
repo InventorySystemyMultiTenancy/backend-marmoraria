@@ -185,7 +185,7 @@ export async function create(req: Request, res: Response) {
   // (acabamento/frontão, instalação) — só o admin vê esses valores.
   if (!req.user) {
     return res.status(201).json({
-      quote: { id: quote.id, quoteNumber: quote.quoteNumber, subtotal: quote.subtotal, total: quote.total },
+      quote: { id: quote.id, quoteNumber: quote.quoteNumber },
     });
   }
 
