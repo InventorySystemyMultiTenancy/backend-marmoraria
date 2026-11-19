@@ -79,3 +79,19 @@ export async function buildQuoteTotals(
 
   return { calculated, subtotal, total };
 }
+
+// Exclusão definitiva de um orçamento e de tudo que depende dele: o pedido
+// gerado na aprovação, as etapas desse pedido e os lançamentos financeiros
+// vinculados ao pedido (a receita lançada na aprovação). Os itens do orçamento
+// são apagados em cascata pelo banco. Tudo numa transação: ou apaga tudo, ou nada.
+export async function deleteQuoteCascade(quoteId: string) {
+  await prisma.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({ where: { quoteId }, select: { id: true } });
+    if (order) {
+      await tx.financialEntry.deleteMany({ where: { orderId: order.id } });
+      await tx.orderStage.deleteMany({ where: { orderId: order.id } });
+      await tx.order.delete({ where: { id: order.id } });
+    }
+    await tx.quote.delete({ where: { id: quoteId } });
+  });
+}

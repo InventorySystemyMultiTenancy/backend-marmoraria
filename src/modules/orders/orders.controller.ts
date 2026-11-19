@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../config/database';
 import { isPriceOnRequestItem, isValidCpfCnpj, onlyDigits, paginationParams } from '../../utils/helpers';
 import { AppError } from '../../middlewares/errorHandler';
+import { deleteQuoteCascade } from '../quotes/quotes.service';
 
 const STAGE_NAMES = ['Aprovado', 'Corte', 'Polimento', 'Acabamento', 'Pronto', 'Entregue'];
 
@@ -110,6 +111,16 @@ export async function update(req: Request, res: Response) {
   }
 
   res.json({ order });
+}
+
+// Exclusão definitiva do pedido. O pedido e o orçamento que o gerou são um só
+// registro para o cliente, então os dois são apagados juntos, com as etapas e
+// a receita lançada na aprovação (para não sobrar valor no financeiro).
+export async function remove(req: Request, res: Response) {
+  const order = await prisma.order.findUnique({ where: { id: req.params.id }, select: { quoteId: true } });
+  if (!order) throw new AppError('Pedido não encontrado', 404);
+  await deleteQuoteCascade(order.quoteId);
+  res.status(204).send();
 }
 
 export async function listStageOptions(req: Request, res: Response) {

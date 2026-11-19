@@ -598,6 +598,9 @@ async function generateOrderNumber(): Promise<string> {
 }
 
 export async function remove(req: Request, res: Response) {
-  await prisma.quote.delete({ where: { id: req.params.id } });
+  const existing = await prisma.quote.findUnique({ where: { id: req.params.id }, select: { id: true } });
+  if (!existing) throw new AppError('Orçamento não encontrado', 404);
+  // Apaga junto o pedido (se já aprovado), as etapas e a receita lançada.
+  await quotesService.deleteQuoteCascade(existing.id);
   res.status(204).send();
 }

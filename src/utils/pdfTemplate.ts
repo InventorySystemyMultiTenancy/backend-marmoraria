@@ -86,7 +86,7 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
   const conditions = [
     ['Formas de pagamento', quote.paymentConditions],
     ['Condições de pagamento', quote.paymentTerm],
-    ['Prazo para ficar pronto', quote.deliveryTerm],
+    ['Prazo de entrega', quote.deliveryTerm],
   ].filter((c): c is [string, string] => Boolean(c[1]?.trim()));
   const conditionsSection = conditions.length
     ? `<div class="section-title">Condições</div>

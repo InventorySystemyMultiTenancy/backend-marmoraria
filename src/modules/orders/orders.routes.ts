@@ -18,5 +18,8 @@ router.patch(
   requirePermission('orders_apply_discount'),
   asyncHandler(controller.applyDiscount)
 );
+// Exclusão definitiva (pedido + orçamento de origem) — mesma permissão de
+// excluir orçamento, já que os dois são apagados juntos.
+router.delete('/:id', requireAuth, requirePermission('quotes_delete'), asyncHandler(controller.remove));
 
 export default router;
