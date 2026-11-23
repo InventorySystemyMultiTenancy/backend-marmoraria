@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import * as controller from './quotes.controller';
-import { requireAuth, requireRole } from '../../middlewares/auth';
+import { requireAuth, requireRole, requireSiteAuth } from '../../middlewares/auth';
 import { requirePermission } from '../../middlewares/permissions';
 import { asyncHandler } from '../../utils/asyncHandler';
 
 const router = Router();
 
-// Rota pública para orçamento self-service do e-commerce
-router.post('/public', asyncHandler(controller.create));
+// Orçamento self-service do site: exige login (cliente com acesso criado pelo
+// admin, ou o próprio funcionário/admin).
+router.post('/public', requireSiteAuth, asyncHandler(controller.create));
 
 router.get('/', requireAuth, requirePermission('quotes_view'), asyncHandler(controller.list));
 router.get('/:id', requireAuth, requirePermission('quotes_view'), asyncHandler(controller.getOne));

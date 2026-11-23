@@ -10,8 +10,6 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: JWT_EXPIRES_IN
-        value: 7d
       - key: DATABASE_URL
         fromDatabase:
           name: marmoraria-db

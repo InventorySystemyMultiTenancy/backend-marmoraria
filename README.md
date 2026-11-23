@@ -29,7 +29,6 @@ A API sobe em `http://localhost:3001`. Healthcheck em `GET /health`.
 |---|---|
 | `DATABASE_URL` | String de conexão do PostgreSQL |
 | `JWT_SECRET` | Chave secreta para assinatura dos tokens JWT |
-| `JWT_EXPIRES_IN` | Validade do token (ex: `7d`) |
 | `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Credenciais do Cloudinary para upload de imagens |
 | `FRONTEND_URL` | URL do frontend, usada na configuração de CORS |
 | `PORT` | Porta da API (padrão `3001`) |

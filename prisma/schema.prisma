@@ -60,6 +60,24 @@ model Client {
   updatedAt DateTime @updatedAt
 
   quotes Quote[]
+  login  ClientLogin?
+}
+
+// Acesso do cliente ao site (só para montar orçamentos — nunca entra no admin).
+// Fica numa tabela à parte para o hash da senha nunca sair junto com o cadastro
+// do cliente nos includes de orçamentos/pedidos/PDF.
+model ClientLogin {
+  id                String    @id @default(cuid())
+  clientId          String    @unique
+  client            Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  email             String    @unique
+  passwordHash      String
+  // Tokens emitidos antes desta data deixam de valer (troca de senha derruba as
+  // sessões abertas com a senha antiga).
+  passwordChangedAt DateTime  @default(now())
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 // ─── MÁRMORES / CATÁLOGO ─────────────────────────────────

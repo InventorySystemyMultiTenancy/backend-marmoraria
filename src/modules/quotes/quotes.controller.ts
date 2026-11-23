@@ -102,6 +102,14 @@ export async function getOne(req: Request, res: Response) {
 export async function create(req: Request, res: Response) {
   const data = createQuoteSchema.parse(req.body);
 
+  // Cliente logado no site: o orçamento sempre fica no cadastro dele (nunca no
+  // de outro cliente informado no corpo da requisição).
+  if (req.siteClient) {
+    data.clientId = req.siteClient.clientId;
+    data.clientName = data.clientName || req.siteClient.name;
+    data.source = 'SELF_SERVICE';
+  }
+
   if (!data.clientId && !data.clientName) {
     throw new AppError('Informe um cliente cadastrado ou os dados do cliente avulso', 400);
   }
