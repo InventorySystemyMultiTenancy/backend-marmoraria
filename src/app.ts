@@ -20,6 +20,7 @@ import pdfRoutes from './modules/pdf/pdf.routes';
 import companyRoutes from './modules/company/company.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import aiRoutes from './modules/ai/ai.routes';
+import draftsRoutes from './modules/drafts/drafts.routes';
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/pdf', pdfRoutes);
 app.use('/api/company', companyRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/quote-drafts', draftsRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

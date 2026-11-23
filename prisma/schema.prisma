@@ -36,6 +36,7 @@ model User {
 
   quotes Quote[] @relation("CreatedBy")
   orders Order[] @relation("AssignedTo")
+  drafts QuoteDraft[]
 }
 
 enum UserRole {
@@ -78,6 +79,41 @@ model ClientLogin {
   lastLoginAt       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  drafts QuoteDraft[]
+}
+
+// ─── RASCUNHOS DE ORÇAMENTO ──────────────────────────────
+// Orçamento ainda não criado, salvo no login de quem está montando (funcionário
+// ou cliente). Cada dono tem no máximo um rascunho "em andamento" por contexto
+// (salvo automaticamente) e quantos rascunhos salvos quiser pelo botão.
+model QuoteDraft {
+  id            String       @id @default(cuid())
+  context       DraftContext
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clientLoginId String?
+  clientLogin   ClientLogin? @relation(fields: [clientLoginId], references: [id], onDelete: Cascade)
+
+  isAutosave     Boolean @default(false)
+  name           String?
+  // Estado do formulário de montagem (formato definido pelo frontend).
+  data           Json
+  // Resumo para a lista de rascunhos.
+  itemCount      Int     @default(0)
+  estimatedTotal Float?
+  clientLabel    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, context])
+  @@index([clientLoginId, context])
+}
+
+enum DraftContext {
+  SITE
+  ADMIN
 }
 
 // ─── MÁRMORES / CATÁLOGO ─────────────────────────────────
