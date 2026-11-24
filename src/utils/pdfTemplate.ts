@@ -26,6 +26,24 @@ function formatDate(date: Date | null | undefined) {
   return new Date(date).toLocaleDateString('pt-BR');
 }
 
+// "Não mostrar valor total": sem subtotal nem TOTAL — só desconto e frete como
+// linhas avulsas, se existirem (são valores próprios, não a soma dos itens).
+function hiddenTotalLines(quote: QuoteWithRelations, hasPriceOnRequest: boolean) {
+  const lines: string[] = [];
+  if (!hasPriceOnRequest) {
+    const discountValue = quote.discount + (quote.subtotal * quote.discountPct) / 100;
+    if (discountValue > 0) {
+      lines.push(`<div><span>Desconto:</span><span>-${formatCurrency(discountValue)}</span></div>`);
+    }
+  }
+  if (quote.freight > 0) {
+    lines.push(
+      `<div><span>Frete${quote.freightDistanceKm ? ` (${quote.freightDistanceKm}km)` : ''}:</span><span>${formatCurrency(quote.freight)}</span></div>`
+    );
+  }
+  return lines.length ? `<div class="totals">${lines.join('')}</div>` : '';
+}
+
 export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | null) {
   const clientName = quote.client?.name ?? quote.clientName ?? 'Cliente';
   const clientPhone = quote.client?.phone ?? quote.clientPhone ?? '-';
@@ -163,7 +181,7 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
       <tbody>${rows}</tbody>
     </table>
 
-    ${hasPriceOnRequest ? `<div class="totals">
+    ${quote.hideTotal ? hiddenTotalLines(quote, hasPriceOnRequest) : hasPriceOnRequest ? `<div class="totals">
       <div class="total"><span>TOTAL:</span><span>Sob consulta</span></div>
     </div>` : `<div class="totals">
       <div><span>Subtotal:</span><span>${formatCurrency(quote.subtotal)}</span></div>

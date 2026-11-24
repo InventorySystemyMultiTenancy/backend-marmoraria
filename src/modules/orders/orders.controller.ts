@@ -258,11 +258,13 @@ export async function trackOrder(req: Request, res: Response) {
         quoteNumber: order.quote.quoteNumber,
         clientName: order.quote.client?.name ?? order.quote.clientName,
         priceOnRequest: onRequest,
-        subtotal: onRequest ? null : order.quote.subtotal,
+        // Lojista escolheu não mostrar a soma: só os valores de cada item.
+        hideTotal: order.quote.hideTotal,
+        subtotal: onRequest || order.quote.hideTotal ? null : order.quote.subtotal,
         discount: onRequest ? 0 : order.quote.discount,
         discountPct: onRequest ? 0 : order.quote.discountPct,
         freight: onRequest ? 0 : order.quote.freight,
-        total: onRequest ? null : order.quote.total,
+        total: onRequest || order.quote.hideTotal ? null : order.quote.total,
         showExtras: order.quote.showExtras,
         items: order.quote.items.map((item) => {
           const itemOnRequest = isPriceOnRequestItem(item, item.marble);

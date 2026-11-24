@@ -49,6 +49,13 @@ router.patch(
   requirePermission('quotes_edit'),
   asyncHandler(controller.updateShowExtras)
 );
+// Mostrar ou não o valor total (soma dos itens) no PDF e no acompanhamento.
+router.patch(
+  '/:id/hide-total',
+  requireAuth,
+  requirePermission('quotes_edit'),
+  asyncHandler(controller.updateHideTotal)
+);
 router.patch(
   '/:id/status',
   requireAuth,

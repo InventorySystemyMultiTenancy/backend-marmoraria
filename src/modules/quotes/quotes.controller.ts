@@ -37,6 +37,8 @@ const createQuoteSchema = z.object({
   deliveryAddress: z.string().trim().max(500).optional(),
   // Custo adicional (extras) só aparece no PDF/acompanhamento se marcado.
   showExtras: z.boolean().default(false),
+  // Não mostrar a soma (subtotal/total) no PDF e no acompanhamento.
+  hideTotal: z.boolean().default(false),
   projectName: z.string().trim().max(200).optional(),
   paymentConditions: z.string().trim().max(1000).optional(),
   paymentTerm: z.string().trim().max(1000).optional(),
@@ -162,6 +164,7 @@ export async function create(req: Request, res: Response) {
       deliveryAddress: data.deliveryAddress || undefined,
       total,
       showExtras: data.showExtras,
+      hideTotal: data.hideTotal,
       ...quoteInfoFields(data),
       notes: data.notes,
       validUntil: data.validUntil ? new Date(data.validUntil) : addBusinessDays(new Date(), 10),
@@ -230,6 +233,7 @@ export async function update(req: Request, res: Response) {
         freightRatePerKm: data.freightRatePerKm,
         deliveryAddress: data.deliveryAddress,
         showExtras: data.showExtras,
+        hideTotal: data.hideTotal,
         ...quoteInfoFields(data),
         notes: data.notes,
         subtotal,
@@ -268,6 +272,7 @@ export async function update(req: Request, res: Response) {
       clientEmail: data.clientEmail || undefined,
       clientCpfCnpj: data.clientCpfCnpj ? onlyDigits(data.clientCpfCnpj) : undefined,
       showExtras: data.showExtras,
+      hideTotal: data.hideTotal,
       ...quoteInfoFields(data),
       notes: data.notes,
     },
@@ -391,6 +396,23 @@ export async function updateShowExtras(req: Request, res: Response) {
   const quote = await prisma.quote.update({
     where: { id: req.params.id },
     data: { showExtras },
+    include: quoteDetailInclude,
+  });
+
+  res.json({ quote });
+}
+
+// Liga/desliga a exibição do valor total (soma dos itens) no PDF e no
+// acompanhamento. Não mexe em valores.
+export async function updateHideTotal(req: Request, res: Response) {
+  const { hideTotal } = z.object({ hideTotal: z.boolean() }).parse(req.body);
+
+  const existing = await prisma.quote.findUnique({ where: { id: req.params.id } });
+  if (!existing) throw new AppError('Orçamento não encontrado', 404);
+
+  const quote = await prisma.quote.update({
+    where: { id: req.params.id },
+    data: { hideTotal },
     include: quoteDetailInclude,
   });
 

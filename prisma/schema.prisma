@@ -206,6 +206,10 @@ model Quote {
   // no total do item e do orçamento — só não é detalhado.
   showExtras Boolean @default(false)
 
+  // Pedido do lojista: quando ligado, o PDF e o acompanhamento mostram só o valor
+  // de cada item, sem subtotal/total do orçamento. Os valores continuam salvos.
+  hideTotal Boolean @default(false)
+
   // Informações opcionais do orçamento — cada uma só aparece no PDF se preenchida.
   projectName       String?
   paymentConditions String? // formas de pagamento (ex: Pix, cartão em 3x)
