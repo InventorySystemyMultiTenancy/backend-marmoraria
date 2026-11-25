@@ -182,6 +182,9 @@ model Quote {
   clientPhone   String?
   clientEmail   String?
   clientCpfCnpj String?
+  // Endereço do cliente avulso (sem cadastro). Cliente cadastrado usa o
+  // endereço do próprio cadastro.
+  clientAddress String?
 
   createdById String
   createdBy   User   @relation("CreatedBy", fields: [createdById], references: [id])

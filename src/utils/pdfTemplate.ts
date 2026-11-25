@@ -75,7 +75,9 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
   // Endereço do cadastro do cliente (rua + cidade/UF) e, separado, o endereço
   // da obra/entrega informado no orçamento ou pedido.
   const clientCityState = [quote.client?.city?.trim(), quote.client?.state?.trim()].filter(Boolean).join('/');
-  const clientAddress = [quote.client?.address?.trim(), clientCityState].filter(Boolean).join(' — ');
+  const clientAddress = quote.client
+    ? [quote.client.address?.trim(), clientCityState].filter(Boolean).join(' — ')
+    : quote.clientAddress?.trim() ?? '';
   const deliveryAddress = quote.deliveryAddress?.trim() ?? '';
   const logoSrc = bundledLogoDataUri() ?? company?.logoUrl ?? null;
 

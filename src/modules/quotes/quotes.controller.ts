@@ -28,6 +28,7 @@ const createQuoteSchema = z.object({
     .string()
     .optional()
     .refine((v) => !v || isValidCpfCnpj(v), 'Informe um CPF ou CNPJ válido'),
+  clientAddress: z.string().trim().max(300).optional(),
   items: z.array(quoteItemSchema).min(1),
   discount: z.number().nonnegative().default(0),
   discountPct: z.number().min(0).max(100).default(0),
@@ -154,6 +155,7 @@ export async function create(req: Request, res: Response) {
       clientPhone: data.clientPhone,
       clientEmail: data.clientEmail || undefined,
       clientCpfCnpj,
+      clientAddress: data.clientAddress || undefined,
       createdById,
       subtotal,
       discount: data.discount,
@@ -473,7 +475,8 @@ const updateClientInfoSchema = z.object({
     .trim()
     .optional()
     .refine((v) => !v || isValidCpfCnpj(v), 'Informe um CPF ou CNPJ válido'),
-  // Só existem no cadastro do cliente (cliente avulso não tem esses campos).
+  // Endereço: no cadastro (cliente cadastrado) ou no próprio orçamento (avulso).
+  // Cidade/UF só existem no cadastro do cliente.
   address: z.string().trim().max(300).optional(),
   city: z.string().trim().max(100).optional(),
   state: z.string().trim().max(50).optional(),
@@ -515,7 +518,14 @@ export async function updateClientInfo(req: Request, res: Response) {
 
   const quote = await prisma.quote.update({
     where: { id: req.params.id },
-    data: { clientName: data.name, clientPhone: phone, clientEmail: email, clientCpfCnpj: cpfCnpj },
+    data: {
+      clientName: data.name,
+      clientPhone: phone,
+      clientEmail: email,
+      clientCpfCnpj: cpfCnpj,
+      // Avulso: o endereço fica no orçamento. Cadastrado: já foi salvo no cadastro.
+      ...(!existing.clientId && data.address !== undefined ? { clientAddress: data.address || null } : {}),
+    },
     include: quoteDetailInclude,
   });
 
