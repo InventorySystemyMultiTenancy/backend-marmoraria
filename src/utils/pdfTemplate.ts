@@ -1,5 +1,29 @@
+import fs from 'fs';
+import path from 'path';
 import { Quote, QuoteItem, Marble, Client, Company, Order } from '@prisma/client';
 import { isPriceOnRequestItem } from './helpers';
+
+// Logo da Pedras Pedroza embutida no PDF (base64), lida uma vez do disco.
+// Fica em assets/ na raiz do backend (fora de src/, então vale tanto no
+// `tsx` de dev quanto no `node dist/` de produção, que rodam a partir da raiz).
+let cachedLogo: string | null | undefined;
+function bundledLogoDataUri(): string | null {
+  if (cachedLogo !== undefined) return cachedLogo;
+  const candidates = [
+    path.join(process.cwd(), 'assets', 'logo-pdf.png'),
+    path.join(__dirname, '..', '..', 'assets', 'logo-pdf.png'),
+  ];
+  cachedLogo = null;
+  for (const file of candidates) {
+    try {
+      cachedLogo = `data:image/png;base64,${fs.readFileSync(file).toString('base64')}`;
+      break;
+    } catch {
+      // tenta o próximo caminho
+    }
+  }
+  return cachedLogo;
+}
 
 type QuoteWithRelations = Quote & {
   items: (QuoteItem & { marble: Marble })[];
@@ -48,6 +72,12 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
   const clientName = quote.client?.name ?? quote.clientName ?? 'Cliente';
   const clientPhone = quote.client?.phone ?? quote.clientPhone ?? '-';
   const clientEmail = quote.client?.email ?? quote.clientEmail ?? '-';
+  // Endereço do cadastro do cliente (rua + cidade/UF) e, separado, o endereço
+  // da obra/entrega informado no orçamento ou pedido.
+  const clientCityState = [quote.client?.city?.trim(), quote.client?.state?.trim()].filter(Boolean).join('/');
+  const clientAddress = [quote.client?.address?.trim(), clientCityState].filter(Boolean).join(' — ');
+  const deliveryAddress = quote.deliveryAddress?.trim() ?? '';
+  const logoSrc = bundledLogoDataUri() ?? company?.logoUrl ?? null;
 
   const rows = quote.items
     .map((item) => {
@@ -119,8 +149,8 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
     <style>
       * { box-sizing: border-box; }
       body { font-family: 'Helvetica', Arial, sans-serif; color: #1A1614; margin: 0; padding: 40px; font-size: 13px; }
-      .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #C9A96E; padding-bottom: 16px; margin-bottom: 24px; }
-      .header img { height: 56px; }
+      .header { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #C9A96E; padding-bottom: 16px; margin-bottom: 24px; }
+      .header img { height: 72px; width: 72px; object-fit: contain; flex-shrink: 0; }
       .company-name { font-size: 22px; font-weight: bold; color: #1A1614; }
       .company-info { font-size: 11px; color: #6B6560; }
       .quote-meta { display: flex; justify-content: space-between; margin-bottom: 20px; background: #F5F0E8; padding: 12px 16px; border-radius: 8px; }
@@ -139,6 +169,7 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
   </head>
   <body>
     <div class="header">
+      ${logoSrc ? `<img src="${logoSrc}" alt="" />` : ''}
       <div>
         <div class="company-name">${company?.name ?? 'Marmoraria Pedras Pedroza'}</div>
         <div class="company-info">
@@ -148,7 +179,6 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
           ${company?.email ?? ''}
         </div>
       </div>
-      ${company?.logoUrl ? `<img src="${company.logoUrl}" />` : ''}
     </div>
 
     <div class="quote-meta">
@@ -169,7 +199,13 @@ export function renderQuoteHtml(quote: QuoteWithRelations, company: Company | nu
     <div>Nome: ${clientName}</div>
     <div>Telefone: ${clientPhone}</div>
     <div>Email: ${clientEmail}</div>
-    ${quote.deliveryAddress?.trim() ? `<div>Endereço de entrega: ${escapeHtml(quote.deliveryAddress)}</div>` : ''}
+    ${
+      clientAddress && clientAddress !== deliveryAddress
+        ? `<div>Endereço: ${escapeHtml(clientAddress)}</div>`
+        : ''
+    }
+    ${deliveryAddress ? `<div>Endereço de entrega/obra: ${escapeHtml(deliveryAddress)}</div>` : ''}
+    ${!clientAddress && !deliveryAddress ? '<div>Endereço: -</div>' : ''}
 
     ${incompleteBanner}
 
